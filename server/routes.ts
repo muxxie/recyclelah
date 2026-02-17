@@ -156,7 +156,11 @@ export async function registerRoutes(
       }
 
       const safeUser = { ...user, password: undefined };
-      (req as any).login({ claims: { sub: user.id, email: user.email, first_name: user.firstName, last_name: user.lastName } }, (err: any) => {
+      const sessionUser = {
+        claims: { sub: user.id, email: user.email, first_name: user.firstName, last_name: user.lastName },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
+      };
+      (req as any).login(sessionUser, (err: any) => {
         if (err) return res.status(500).json({ message: "Login failed" });
         res.json(safeUser);
       });
