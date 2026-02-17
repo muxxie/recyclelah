@@ -1,0 +1,193 @@
+Enhance the RecycleLah system with WhatsApp phone-number verification, Google login, IC verification, duplicate-prevention, and a full admin dashboard. All components must be mobile-first and secure.
+
+===========================================================
+WHATSAPP PHONE NUMBER VERIFICATION (OTP)
+===========================================================
+1. Integrate WhatsApp Cloud API (Meta) for OTP verification.
+2. When a user enters their phone number:
+   - Validate Malaysian format (601X…)
+   - Generate a 6-digit OTP
+   - Store OTP temporarily (expires in 5 minutes)
+   - Send OTP via WhatsApp message:
+     “RecycleLah Verification Code: {OTP}. Valid for 5 minutes.”
+
+3. Create endpoint: /verify-otp
+   - User submits phone + OTP
+   - Check match + expiry
+   - If valid → mark phoneVerified = true
+   - If invalid → return error
+
+4. Prevent login/registration until phoneVerified = true.
+
+5. Security:
+   - Do NOT store OTP permanently
+   - Hash OTP before storing
+   - Auto-delete expired OTPs
+
+6. UI (mobile-first):
+   - Phone input screen
+   - “Send OTP via WhatsApp” button
+   - OTP entry screen
+   - Countdown timer (5 minutes)
+   - Resend OTP after 60 seconds
+
+===========================================================
+GOOGLE LOGIN (GMAIL OAUTH)
+===========================================================
+1. Add Google OAuth login using Google Identity Services.
+2. Capture: email, name, Google ID.
+3. If new user → onboarding flow (role, phone, IC verification).
+4. If existing user → login immediately.
+5. Duplicate prevention:
+   - If email exists → block registration
+   - If phone exists → block registration
+   - If IC exists → block registration
+
+===========================================================
+ADMIN DETECTION (EMAIL-BASED)
+===========================================================
+1. Add environment variable: ADMIN_EMAILS
+2. If login email matches → assign role = ADMIN
+3. Admin bypasses IC verification
+4. Admin dashboard loads automatically
+5. Protect admin routes with middleware
+
+===========================================================
+IC VERIFICATION MODULE (FRONT + BACK + OCR)
+===========================================================
+1. Capture IC front photo (mobile camera)
+2. Capture IC back photo
+3. Upload to secure storage (Supabase/Firebase)
+4. OCR extraction using Tesseract.js or external API
+5. Extract:
+   - Full name
+   - IC number
+6. Validate IC format (Malaysia NRIC)
+7. Store encrypted IC number + URLs
+8. Mark verificationStatus = “Verified” or “Pending”
+9. Admin can manually approve/reject
+
+===========================================================
+SELLER INTERFACE (MOBILE-FIRST)
+===========================================================
+Pages:
+- Dashboard
+- Create Pickup Request
+- Track Collector (real-time map)
+- Wallet (balance, top-up, history)
+- Upload receipt
+- Settings
+
+===========================================================
+COLLECTOR INTERFACE (MOBILE-FIRST)
+===========================================================
+Pages:
+- Dashboard
+- Available Jobs
+- Accept Job (requires wallet credit)
+- Active Job (navigation + upload receipt)
+- Wallet (earnings, history)
+- Settings
+
+===========================================================
+ADMIN DASHBOARD (RESPONSIVE)
+===========================================================
+Admin-only pages:
+- Overview stats
+- User list (seller/collector/admin)
+- View user details
+- BAN / UNBAN user
+- View banned accounts
+- Jobs list
+- Wallet balances + escrow ledger
+- Approve withdrawals
+- Adjust recycling prices
+- View IC images
+
+===========================================================
+ESCROW + WALLET LOGIC
+===========================================================
+1. Seller must have enough balance to create job.
+2. When collector accepts job:
+   - Lock seller’s amount into ESCROW.
+3. After receipt verification:
+   - Release ESCROW:
+     - Collector payout
+     - Platform commission
+     - Seller receives remaining amount
+4. Wallet top-up:
+   - Mock FPX API (ToyyibPay/Billplz placeholder)
+5. Withdrawal:
+   - Admin approval required
+
+===========================================================
+REAL-TIME TRACKING
+===========================================================
+- Collector sends GPS coordinates every few seconds
+- Seller sees collector moving on map
+- Use WebSockets or polling
+- Map shows seller, collector, recycling center
+
+===========================================================
+RECYCLING CENTER MODULE
+===========================================================
+- Hardcode 3–5 centers
+- Each center has name, address, GPS coordinates
+
+===========================================================
+PRICE API (MOCK)
+===========================================================
+Endpoint /prices returns:
+- Paper price
+- Plastic price
+- Metal price
+- E-waste price
+
+===========================================================
+TECH STACK
+===========================================================
+- Node.js + Express
+- Replit Database or SQLite
+- HTML/CSS/JS frontend
+- Leaflet.js for maps
+- WebSockets
+- WhatsApp Cloud API
+- Google OAuth
+
+===========================================================
+ARCHITECTURE REQUIREMENTS
+===========================================================
+Folder structure:
+  /routes
+  /controllers
+  /models
+  /middleware
+  /utils
+  /public
+  /views
+
+===========================================================
+DELIVERABLES
+===========================================================
+1. WhatsApp OTP verification
+2. Google OAuth login
+3. Duplicate-prevention logic
+4. IC verification module
+5. Seller interface
+6. Collector interface
+7. Admin dashboard
+8. Wallet + escrow system
+9. Real-time tracking
+10. Price API
+11. Mobile-first UI
+
+===========================================================
+BEGIN IMPLEMENTATION NOW
+===========================================================
+Start with:
+1. WhatsApp OTP module
+2. Google OAuth
+3. Duplicate-prevention logic
+4. Admin middleware
+5. IC verification
+6. Seller/collector/admin UIs

@@ -1,17 +1,21 @@
 import { users, requests, facilities, marketPrices, walletTransactions, type User, type UpsertUser, type Request, type InsertRequest, type Facility, type InsertFacility, type MarketPrice, type InsertMarketPrice, type WalletTransaction, type InsertWalletTransaction } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, or, ne } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByIcNumber(icNumber: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserVerification(id: string, status: string): Promise<User>;
   updateUserStatus(id: string, isOnline: boolean): Promise<User>;
   updateUserLocation(id: string, lat: string, lng: string): Promise<void>;
   updateUserRole(id: string, role: string): Promise<User>;
+  updateUserBan(id: string, banned: boolean, banReason?: string): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
   createRequest(request: any): Promise<Request>;
@@ -52,6 +56,18 @@ export class DatabaseStorage implements IStorage {
     return (await db.select().from(users).where(eq(users.email, email)))[0];
   }
 
+  async getUserByPhone(phone: string) {
+    return (await db.select().from(users).where(eq(users.phone, phone)))[0];
+  }
+
+  async getUserByIcNumber(icNumber: string) {
+    return (await db.select().from(users).where(eq(users.icNumber, icNumber)))[0];
+  }
+
+  async getUserByGoogleId(googleId: string) {
+    return (await db.select().from(users).where(eq(users.googleId, googleId)))[0];
+  }
+
   async createUser(userData: UpsertUser) {
     return (await db.insert(users).values(userData).returning())[0];
   }
@@ -77,6 +93,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserRole(id: string, role: string) {
     return (await db.update(users).set({ role }).where(eq(users.id, id)).returning())[0];
+  }
+
+  async updateUserBan(id: string, banned: boolean, banReason?: string) {
+    return (await db.update(users).set({ banned, banReason: banReason || null, updatedAt: new Date() }).where(eq(users.id, id)).returning())[0];
   }
 
   async getAllUsers() {

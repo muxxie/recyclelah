@@ -47,6 +47,7 @@ export default function AuthPage() {
       password: "",
       role: "seller",
       vehicleType: "",
+      icNumber: "",
       icFrontPhoto: "",
       icBackPhoto: "",
     },
@@ -62,7 +63,8 @@ export default function AuthPage() {
   };
 
   const canGoToStep3 = () => {
-    return icFront.length > 0 && icBack.length > 0;
+    const vals = registerForm.getValues();
+    return icFront.length > 0 && icBack.length > 0 && vals.icNumber.replace(/[-\s]/g, "").length >= 12;
   };
 
   const handleNextStep = async () => {
@@ -70,7 +72,8 @@ export default function AuthPage() {
       const valid = await registerForm.trigger(["firstName", "lastName", "email", "phone", "password", "role"]);
       if (valid) setStep(2);
     } else if (step === 2) {
-      if (canGoToStep3()) setStep(3);
+      const valid = await registerForm.trigger(["icNumber", "icFrontPhoto", "icBackPhoto"]);
+      if (valid && canGoToStep3()) setStep(3);
     }
   };
 
@@ -180,7 +183,7 @@ export default function AuthPage() {
                   </CardTitle>
                   <CardDescription>
                     {step === 1 && "Fill in your personal details"}
-                    {step === 2 && "Take a photo of your Malaysian IC (front & back)"}
+                    {step === 2 && "Provide your IC number and photos"}
                     {step === 3 && "Confirm your details before submitting"}
                   </CardDescription>
                   <div className="flex gap-2 mt-3">
@@ -321,9 +324,28 @@ export default function AuthPage() {
                             <ShieldCheck className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
                             <div className="text-sm text-amber-800 dark:text-amber-200">
                               <p className="font-medium">Malaysian IC Required</p>
-                              <p className="mt-1 opacity-80">Please use your camera to capture clear photos of the front and back of your MyKad/IC. This is required for account verification.</p>
+                              <p className="mt-1 opacity-80">Enter your IC number and capture or upload clear photos of the front and back of your MyKad/IC.</p>
                             </div>
                           </div>
+
+                          <FormField
+                            control={registerForm.control}
+                            name="icNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>IC Number (MyKad)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="e.g. 901231-14-5678"
+                                    maxLength={14}
+                                    {...field}
+                                    data-testid="input-ic-number"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
                           <FormField
                             control={registerForm.control}
@@ -401,9 +423,15 @@ export default function AuthPage() {
                               <p className="text-xs text-muted-foreground">Email</p>
                               <p className="font-medium" data-testid="review-email">{registerForm.getValues("email")}</p>
                             </div>
-                            <div className="p-3 bg-muted/50 rounded-md">
-                              <p className="text-xs text-muted-foreground">Phone</p>
-                              <p className="font-medium" data-testid="review-phone">{registerForm.getValues("phone")}</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="p-3 bg-muted/50 rounded-md">
+                                <p className="text-xs text-muted-foreground">Phone</p>
+                                <p className="font-medium" data-testid="review-phone">{registerForm.getValues("phone")}</p>
+                              </div>
+                              <div className="p-3 bg-muted/50 rounded-md">
+                                <p className="text-xs text-muted-foreground">IC Number</p>
+                                <p className="font-medium" data-testid="review-ic-number">{registerForm.getValues("icNumber")}</p>
+                              </div>
                             </div>
                             <div className="p-3 bg-muted/50 rounded-md">
                               <p className="text-xs text-muted-foreground">Role</p>

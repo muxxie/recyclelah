@@ -1,0 +1,235 @@
+You are building the full MVP backend + frontend for RecycleLah, a recycling pickup platform with three interfaces: SELLER, COLLECTOR, and ADMIN. The system must be mobile-first, secure, and structured cleanly for future conversion into a mobile app.
+
+===========================================================
+AUTHENTICATION SYSTEM (EMAIL + PASSWORD + GOOGLE LOGIN)
+===========================================================
+1. Standard login:
+   - Username/email + password
+   - Role selection: SELLER or COLLECTOR
+   - Phone number required
+
+2. Google OAuth login:
+   - Use Google Identity Services
+   - Capture: email, name, Google ID
+   - If new user → onboarding flow (choose role, phone, IC verification)
+   - If existing user → login immediately
+
+3. Duplicate prevention:
+   Before creating ANY account:
+   - Check if IC number exists (encrypted)
+   - Check if email exists
+   - Check if phone number exists
+   If any match → block registration with message:
+   “Account already exists. Please log in instead.”
+
+===========================================================
+ADMIN DETECTION (EMAIL-BASED)
+===========================================================
+1. Add environment variable: ADMIN_EMAILS
+   Example: “admin@recyclelah.com, hafiz@hazkilgroup.com”
+
+2. If login email matches ADMIN_EMAILS:
+   - Assign role = ADMIN
+   - Skip IC verification
+   - Redirect to admin dashboard
+
+3. Admin routes must be protected by middleware.
+
+===========================================================
+IC VERIFICATION MODULE (FRONT + BACK + OCR)
+===========================================================
+1. Capture IC front photo:
+   - Mobile-friendly camera capture
+   - Preview before upload
+   - Compress image
+   - Upload to secure storage (Supabase or Firebase Storage)
+   - Return secure URL
+
+2. Capture IC back photo:
+   - Same flow as front
+
+3. OCR extraction:
+   - Use Tesseract.js or external OCR API
+   - Extract:
+     - Full name
+     - IC number
+     - Address (optional)
+   - Validate IC format (Malaysia NRIC: YYMMDD-XX-XXXX)
+
+4. Verification logic:
+   - Compare extracted IC number with user input
+   - Mark user as “Verified” if match
+   - Store:
+     - IC number (encrypted)
+     - Front IC URL
+     - Back IC URL
+     - Verification status
+
+5. Security:
+   - Do NOT store raw images in Replit DB
+   - Encrypt IC number
+   - Use environment variables for storage keys
+
+===========================================================
+SELLER INTERFACE (MOBILE-FIRST)
+===========================================================
+Pages:
+- Dashboard (wallet, active jobs, history)
+- Create Pickup Request:
+  - Item type
+  - Estimated weight
+  - Address
+  - GPS coordinates (auto-detect)
+- Track Collector:
+  - Real-time map (Leaflet.js)
+- Wallet:
+  - Balance
+  - Top-up (mock FPX API)
+  - Transaction history
+- Upload receipt
+- Settings
+
+UI:
+- Responsive CSS
+- Large buttons
+- Clean layout
+
+===========================================================
+COLLECTOR INTERFACE (MOBILE-FIRST)
+===========================================================
+Pages:
+- Dashboard (earnings, active jobs)
+- Available Jobs (nearby)
+- Accept Job (requires wallet credit)
+- Active Job:
+  - Navigate to seller
+  - Navigate to recycling center
+  - Upload receipt
+  - Update live location every X seconds
+- Wallet:
+  - Balance
+  - Commission earned
+  - Transaction history
+- Settings
+
+UI:
+- Mobile-first
+- Map optimized for small screens
+
+===========================================================
+ADMIN DASHBOARD (RESPONSIVE)
+===========================================================
+Admin-only pages:
+- Overview stats
+- User list (seller/collector/admin)
+- View user details (IC verification, wallet, jobs)
+- BAN / UNBAN user
+- View banned accounts
+- Jobs list (active, completed, cancelled)
+- Wallet balances + escrow ledger
+- Approve withdrawal requests
+- Adjust recycling prices
+- View IC front/back images
+
+UI:
+- Desktop-first but responsive
+- Tables, filters, search
+
+===========================================================
+ESCROW + WALLET LOGIC
+===========================================================
+1. Seller must have enough balance to create job.
+2. When collector accepts job:
+   - Lock seller’s amount into ESCROW (internal ledger)
+3. After receipt verification:
+   - Release ESCROW:
+     - Collector payout
+     - Platform commission
+     - Seller receives remaining amount (if applicable)
+4. Wallet top-up:
+   - Use mock FPX API (ToyyibPay/Billplz placeholder)
+5. Withdrawal:
+   - Manual approval by admin
+
+===========================================================
+REAL-TIME TRACKING
+===========================================================
+- Collector sends GPS coordinates every few seconds
+- Seller sees collector moving on map
+- Use WebSockets or polling
+- Map shows:
+  - Seller location
+  - Collector location
+  - Recycling center location
+
+===========================================================
+RECYCLING CENTER MODULE
+===========================================================
+- Hardcode 3–5 centers
+- Each center has:
+  - Name
+  - Address
+  - GPS coordinates
+
+===========================================================
+PRICE API (MOCK)
+===========================================================
+Create endpoint /prices returning:
+- Paper price
+- Plastic price
+- Metal price
+- E-waste price
+
+===========================================================
+TECH STACK
+===========================================================
+- Node.js + Express backend
+- Replit Database or SQLite
+- HTML/CSS/JS frontend
+- Leaflet.js for maps
+- WebSockets for tracking
+- REST API for mobile app integration later
+
+===========================================================
+ARCHITECTURE REQUIREMENTS
+===========================================================
+Folder structure:
+  /routes
+  /controllers
+  /models
+  /middleware
+  /utils
+  /public
+  /views
+
+Other requirements:
+- Use environment variables
+- Modular controllers
+- Async/await
+- Error handling
+- Mobile-first responsive CSS
+
+===========================================================
+DELIVERABLES
+===========================================================
+1. Google OAuth login
+2. Duplicate-prevention logic
+3. IC verification module
+4. Seller interface
+5. Collector interface
+6. Admin dashboard
+7. Wallet + escrow system
+8. Real-time tracking
+9. Price API
+10. Clean UI components
+
+===========================================================
+BEGIN IMPLEMENTATION NOW
+===========================================================
+Start by:
+1. Updating user model
+2. Adding Google OAuth routes
+3. Adding duplicate-prevention logic
+4. Creating admin middleware
+5. Building IC verification module
+6. Building seller/collector/admin UIs

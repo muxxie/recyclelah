@@ -9,6 +9,15 @@ import crypto from "crypto";
 
 const locationSubscribers = new Map<number, Set<WebSocket>>();
 
+function getAdminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS || "";
+  return raw.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+}
+
+function isAdminEmail(email: string): boolean {
+  return getAdminEmails().includes(email.toLowerCase());
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -66,12 +75,28 @@ export async function registerRoutes(
   app.post("/api/register", async (req, res) => {
     try {
       const data = registerSchema.parse(req.body);
-      const existing = await storage.getUserByEmail(data.email);
-      if (existing) {
+
+      const existingEmail = await storage.getUserByEmail(data.email);
+      if (existingEmail) {
         return res.status(400).json({ message: "An account with this email already exists" });
       }
+
+      const existingPhone = await storage.getUserByPhone(data.phone);
+      if (existingPhone) {
+        return res.status(400).json({ message: "An account with this phone number already exists" });
+      }
+
+      const normalizedIc = data.icNumber.replace(/[-\s]/g, "");
+      const existingIc = await storage.getUserByIcNumber(normalizedIc);
+      if (existingIc) {
+        return res.status(400).json({ message: "An account with this IC number already exists" });
+      }
+
       const hashedPassword = await bcrypt.hash(data.password, 10);
       const userId = crypto.randomUUID();
+
+      const assignedRole = isAdminEmail(data.email) ? "admin" : data.role;
+
       const user = await storage.createUser({
         id: userId,
         email: data.email,
@@ -79,9 +104,10 @@ export async function registerRoutes(
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
-        role: data.role,
+        role: assignedRole,
         phone: data.phone,
         vehicleType: data.vehicleType || null,
+        icNumber: normalizedIc,
         icFrontPhoto: data.icFrontPhoto,
         icBackPhoto: data.icBackPhoto,
         verificationStatus: "pending",
@@ -110,10 +136,21 @@ export async function registerRoutes(
       if (!user || !user.password) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
+
+      if (user.banned) {
+        return res.status(403).json({ message: `Your account has been banned.${user.banReason ? ` Reason: ${user.banReason}` : ""}` });
+      }
+
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
+
+      if (isAdminEmail(email) && user.role !== "admin") {
+        await storage.updateUserRole(user.id, "admin");
+        user.role = "admin";
+      }
+
       const safeUser = { ...user, password: undefined };
       (req as any).login({ claims: { sub: user.id, email: user.email, first_name: user.firstName, last_name: user.lastName } }, (err: any) => {
         if (err) return res.status(500).json({ message: "Login failed" });
@@ -138,6 +175,35 @@ export async function registerRoutes(
     }
     const user = await storage.updateUserVerification(req.params.id, status);
     res.json(user);
+  });
+
+  // ===== ADMIN: Ban/Unban user =====
+  app.post("/api/admin/users/:id/ban", isAuthenticated, async (req: any, res) => {
+    const adminId = req.user.claims.sub;
+    const admin = await storage.getUser(adminId);
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const targetUser = await storage.getUser(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (targetUser.role === "admin") {
+      return res.status(400).json({ message: "Cannot ban an admin user" });
+    }
+    const { reason } = req.body;
+    const updated = await storage.updateUserBan(req.params.id, true, reason || "Banned by admin");
+    res.json(updated);
+  });
+
+  app.post("/api/admin/users/:id/unban", isAuthenticated, async (req: any, res) => {
+    const adminId = req.user.claims.sub;
+    const admin = await storage.getUser(adminId);
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const updated = await storage.updateUserBan(req.params.id, false);
+    res.json(updated);
   });
 
   app.post("/api/users/status", isAuthenticated, async (req: any, res) => {

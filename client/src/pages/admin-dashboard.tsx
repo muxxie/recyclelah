@@ -6,8 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Users, Package, DollarSign, TrendingUp, Scale, ShieldCheck, ShieldX, ShieldAlert, Eye } from "lucide-react";
+import { Loader2, Users, Package, DollarSign, TrendingUp, Scale, ShieldCheck, ShieldX, ShieldAlert, Eye, Ban, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -54,6 +55,11 @@ function UsersTab() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [banDialogUser, setBanDialogUser] = useState<User | null>(null);
+  const [banReason, setBanReason] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterVerification, setFilterVerification] = useState("all");
 
   const updateRole = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: string }) => {
@@ -78,22 +84,110 @@ function UsersTab() {
     },
   });
 
+  const banUser = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/ban`, { reason });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setBanDialogUser(null);
+      setBanReason("");
+      toast({ title: "User Banned" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to ban user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const unbanUser = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/unban`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User Unbanned" });
+    },
+  });
+
   if (isLoading) return <Loader2 className="animate-spin text-primary mx-auto" />;
+
+  const filtered = users?.filter(u => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !term ||
+      (u.firstName && u.firstName.toLowerCase().includes(term)) ||
+      (u.lastName && u.lastName.toLowerCase().includes(term)) ||
+      (u.email && u.email.toLowerCase().includes(term)) ||
+      (u.phone && u.phone.includes(term)) ||
+      (u.icNumber && u.icNumber.includes(term));
+    const matchesRole = filterRole === "all" || u.role === filterRole;
+    const matchesVerification = filterVerification === "all" || u.verificationStatus === filterVerification;
+    return matchesSearch && matchesRole && matchesVerification;
+  }) || [];
 
   return (
     <>
-      <div className="space-y-2">
-        {users?.map((u) => (
-          <Card key={u.id}>
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search name, email, phone, IC..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-users"
+            />
+          </div>
+          <Select value={filterRole} onValueChange={setFilterRole}>
+            <SelectTrigger className="w-32" data-testid="select-filter-role">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="seller">Seller</SelectItem>
+              <SelectItem value="collector">Collector</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterVerification} onValueChange={setFilterVerification}>
+            <SelectTrigger className="w-36" data-testid="select-filter-verification">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="verified">Verified</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="unverified">Unverified</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <p className="text-xs text-muted-foreground">{filtered.length} user{filtered.length !== 1 ? "s" : ""} found</p>
+
+        {filtered.map((u) => (
+          <Card key={u.id} className={u.banned ? "border-red-300 dark:border-red-800" : ""}>
             <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-medium text-sm truncate" data-testid={`text-user-name-${u.id}`}>
-                  {u.firstName ? `${u.firstName} ${u.lastName || ""}` : u.username || u.email || u.id}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium text-sm truncate" data-testid={`text-user-name-${u.id}`}>
+                    {u.firstName ? `${u.firstName} ${u.lastName || ""}` : u.username || u.email || u.id}
+                  </p>
+                  {u.banned && (
+                    <Badge variant="outline" className="text-[10px] bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800">
+                      <Ban className="w-3 h-3 mr-1" />Banned
+                    </Badge>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 flex-wrap mt-0.5">
                   <p className="text-xs text-muted-foreground truncate">{u.email || "No email"}</p>
                   {u.phone && <p className="text-xs text-muted-foreground">| {u.phone}</p>}
                 </div>
+                {u.banned && u.banReason && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Reason: {u.banReason}</p>
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <VerificationBadge status={u.verificationStatus} />
@@ -103,6 +197,19 @@ function UsersTab() {
                   <Button size="icon" variant="outline" onClick={() => setViewingUser(u)} data-testid={`button-view-ic-${u.id}`}>
                     <Eye className="w-4 h-4" />
                   </Button>
+                )}
+                {u.role !== "admin" && (
+                  <>
+                    {u.banned ? (
+                      <Button size="sm" variant="outline" onClick={() => unbanUser.mutate(u.id)} disabled={unbanUser.isPending} data-testid={`button-unban-${u.id}`}>
+                        Unban
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-200 dark:border-red-800" onClick={() => { setBanDialogUser(u); setBanReason(""); }} data-testid={`button-ban-${u.id}`}>
+                        <Ban className="w-3 h-3 mr-1" /> Ban
+                      </Button>
+                    )}
+                  </>
                 )}
                 <Select defaultValue={u.role} onValueChange={(role) => updateRole.mutate({ id: u.id, role })}>
                   <SelectTrigger className="w-28" data-testid={`select-role-${u.id}`}>
@@ -142,6 +249,10 @@ function UsersTab() {
                   <p className="font-medium">{viewingUser.phone || "N/A"}</p>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">IC Number</p>
+                  <p className="font-medium" data-testid="text-ic-number">{viewingUser.icNumber || "N/A"}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md col-span-2">
                   <p className="text-xs text-muted-foreground">Status</p>
                   <VerificationBadge status={viewingUser.verificationStatus} />
                 </div>
@@ -183,6 +294,42 @@ function UsersTab() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!banDialogUser} onOpenChange={() => setBanDialogUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ban User</DialogTitle>
+            <DialogDescription>
+              Ban {banDialogUser?.firstName} {banDialogUser?.lastName} ({banDialogUser?.email}). They will not be able to log in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium mb-1">Reason for ban</p>
+              <Textarea
+                placeholder="Enter reason for banning this user..."
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                data-testid="input-ban-reason"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setBanDialogUser(null)} data-testid="button-cancel-ban">
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => banDialogUser && banUser.mutate({ id: banDialogUser.id, reason: banReason })}
+                disabled={banUser.isPending}
+                data-testid="button-confirm-ban"
+              >
+                {banUser.isPending ? "Banning..." : "Confirm Ban"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
@@ -283,7 +430,7 @@ function PricesTab() {
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xl font-bold font-display text-primary">RM {Number(p.pricePerKg).toFixed(2)}/kg</p>
                 <Button
                   size="sm"

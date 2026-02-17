@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Camera, RotateCcw, Check, X } from "lucide-react";
+import { Camera, RotateCcw, Check, X, Upload } from "lucide-react";
 
 interface ICCameraCaptureProps {
   label: string;
@@ -13,6 +13,7 @@ interface ICCameraCaptureProps {
 export function ICCameraCapture({ label, value, onChange, testId }: ICCameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string>(value || "");
@@ -46,7 +47,7 @@ export function ICCameraCapture({ label, value, onChange, testId }: ICCameraCapt
       }
       setIsCameraOpen(true);
     } catch (err: any) {
-      setCameraError("Could not access camera. Please allow camera permissions and try again.");
+      setCameraError("Could not access camera. Please use the file upload option instead.");
       setIsCameraOpen(false);
     }
   }, [facingMode, stopCamera]);
@@ -82,11 +83,35 @@ export function ICCameraCapture({ label, value, onChange, testId }: ICCameraCapt
     setIsCameraOpen(false);
   }, [onChange, stopCamera]);
 
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCameraError("Please select an image file (JPG, PNG, etc.)");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setCameraError("File too large. Maximum size is 5MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setCapturedImage(dataUrl);
+      onChange(dataUrl);
+      setCameraError("");
+    };
+    reader.onerror = () => {
+      setCameraError("Failed to read the file. Please try again.");
+    };
+    reader.readAsDataURL(file);
+  }, [onChange]);
+
   const retake = useCallback(() => {
     setCapturedImage("");
     onChange("");
-    startCamera();
-  }, [onChange, startCamera]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [onChange]);
 
   const cancelCamera = useCallback(() => {
     stopCamera();
@@ -159,12 +184,38 @@ export function ICCameraCapture({ label, value, onChange, testId }: ICCameraCapt
   return (
     <div data-testid={testId}>
       <p className="text-sm font-medium mb-2">{label}</p>
-      <Card
-        className="flex flex-col items-center justify-center gap-2 p-6 border-dashed cursor-pointer hover-elevate"
-        onClick={() => startCamera()}
-      >
-        <Camera className="w-8 h-8 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Tap to open camera</span>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileUpload}
+        data-testid={`${testId}-file-input`}
+      />
+      <Card className="flex flex-col items-center justify-center gap-3 p-6 border-dashed">
+        <div className="flex gap-3 w-full">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={() => startCamera()}
+            data-testid={`${testId}-open-camera`}
+          >
+            <Camera className="w-4 h-4 mr-2" />
+            Camera
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={() => fileInputRef.current?.click()}
+            data-testid={`${testId}-open-upload`}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload
+          </Button>
+        </div>
+        <span className="text-xs text-muted-foreground">Take a photo or upload an image of your IC</span>
         {cameraError && (
           <p className="text-xs text-destructive text-center mt-1">{cameraError}</p>
         )}
