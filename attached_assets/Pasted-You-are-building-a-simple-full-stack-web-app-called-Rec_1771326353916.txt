@@ -1,0 +1,120 @@
+You are building a simple full-stack web app called **RecycleLah!**.  
+This app allows users to request immediate or scheduled recycling pickups, similar to Uber/Grab but for recyclable items.
+
+Build the app using:
+- Frontend: HTML, CSS, JavaScript (or React if needed)
+- Backend: Node.js + Express
+- Database: JSON file or simple SQLite (whichever is easier)
+- Deployment: Local server (no external dependencies unless necessary)
+
+========================================
+APP OVERVIEW
+========================================
+
+RecycleLah! has two user types:
+1. **Seller (User who wants to recycle items)**
+2. **Collector (Gig worker who picks up items)**
+
+The app must support the following core features:
+
+========================================
+FEATURE 1 — SELLER REQUEST PICKUP
+========================================
+Seller can:
+- Create an account (simple username + phone number)
+- Submit a pickup request with:
+  - Item type (plastic, paper, metal, e-waste, etc.)
+  - Estimated weight
+  - Photos (optional, can be simulated)
+  - GPS coordinates (use browser geolocation API)
+  - Immediate pickup OR scheduled pickup time
+
+When submitted:
+- The request is stored in the database
+- The system finds the nearest available collector (based on GPS distance)
+- The collector receives a job notification
+
+========================================
+FEATURE 2 — COLLECTOR JOB SYSTEM
+========================================
+Collector can:
+- Create an account (name + vehicle type)
+- Go “Online” or “Offline”
+- Receive job alerts when a seller nearby submits a request
+- Accept or reject the job
+- Navigate to seller location (simple Google Maps link)
+- Upload proof photos of collected items
+- Submit items to a recycle center
+
+========================================
+FEATURE 3 — ITEM VERIFICATION & PAYOUT
+========================================
+When collector uploads proof:
+- The system verifies item type (simple rule-based classification)
+- The system calculates payout using a price table stored in the database
+- Payout = (market price × weight)
+- Collector receives full payout instantly (simulated)
+- App takes 20% commission automatically
+- Seller receives payout instantly via “collector credit” (simulated)
+
+========================================
+FEATURE 4 — RECYCLE CENTER DIRECTORY
+========================================
+App must include:
+- A list of nearby recycle centers
+- Each center has:
+  - Name
+  - Address
+  - GPS coordinates
+  - Accepted materials
+  - Current market price per kg
+
+Collectors can:
+- Select which center they submitted items to
+- System updates payout based on that center’s price list
+
+========================================
+FEATURE 5 — MARKET PRICE DISPLAY
+========================================
+A simple page showing:
+- Current market price for plastic, paper, metal, e-waste
+- Prices pulled from the recycle center database
+
+========================================
+FEATURE 6 — ADMIN COMMISSION TRACKING
+========================================
+Admin dashboard (simple page):
+- Total jobs completed
+- Total kg collected
+- Total payout to sellers
+- Total payout to collectors
+- Total commission earned (20%)
+
+========================================
+SYSTEM REQUIREMENTS
+========================================
+- Keep the code modular and clean
+- Use simple UI (no need for fancy design)
+- Use REST API endpoints for all operations
+- Use JSON or SQLite for data storage
+- Include comments explaining each function
+- Provide instructions on how to run the app locally
+
+========================================
+DELIVERABLES
+========================================
+Generate:
+1. Full backend code (Node.js + Express)
+2. Full frontend code (HTML/CSS/JS or React)
+3. Database schema (JSON or SQLite)
+4. API routes:
+   - /seller/create
+   - /seller/requestPickup
+   - /collector/register
+   - /collector/goOnline
+   - /collector/acceptJob
+   - /collector/submitItems
+   - /admin/stats
+5. Instructions to run the app on Replit
+
+Build the simplest working version first, then improve step-by-step.
