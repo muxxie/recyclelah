@@ -104,6 +104,46 @@ export function parseIcBirthDate(icNumber: string): Date | null {
   return date;
 }
 
+export function parseIcGender(icNumber: string): "male" | "female" | null {
+  const cleaned = icNumber.replace(/[-\s]/g, "");
+  if (cleaned.length < 12) return null;
+  const lastDigit = parseInt(cleaned.charAt(11), 10);
+  return lastDigit % 2 === 0 ? "female" : "male";
+}
+
+export function parseIcStateCode(icNumber: string): string | null {
+  const cleaned = icNumber.replace(/[-\s]/g, "");
+  if (cleaned.length < 8) return null;
+  const code = cleaned.substring(6, 8);
+  const states: Record<string, string> = {
+    "01": "Johor", "02": "Kedah", "03": "Kelantan", "04": "Melaka",
+    "05": "Negeri Sembilan", "06": "Pahang", "07": "Pulau Pinang", "08": "Perak",
+    "09": "Perlis", "10": "Selangor", "11": "Terengganu", "12": "Sabah",
+    "13": "Sarawak", "14": "W.P. Kuala Lumpur", "15": "W.P. Labuan",
+    "16": "W.P. Putrajaya", "21": "Johor", "22": "Johor", "23": "Kedah",
+    "24": "Kedah", "25": "Kelantan", "26": "Kelantan", "27": "Melaka",
+    "28": "Negeri Sembilan", "29": "Pahang", "30": "Pahang", "31": "Perak",
+    "32": "Perak", "33": "Perlis", "34": "Pulau Pinang", "35": "Pulau Pinang",
+    "36": "Sabah", "37": "Sabah", "38": "Sarawak", "39": "Sarawak",
+    "40": "Selangor", "41": "Selangor", "42": "Terengganu", "43": "Terengganu",
+    "44": "W.P. Kuala Lumpur", "45": "W.P. Kuala Lumpur", "46": "W.P. Labuan",
+    "47": "W.P. Putrajaya", "48": "Sabah", "49": "Sabah",
+    "50": "W.P. Kuala Lumpur", "51": "W.P. Kuala Lumpur", "52": "W.P. Kuala Lumpur",
+    "53": "W.P. Kuala Lumpur", "54": "W.P. Kuala Lumpur", "55": "W.P. Kuala Lumpur",
+    "56": "W.P. Kuala Lumpur", "57": "W.P. Kuala Lumpur", "58": "W.P. Kuala Lumpur",
+    "59": "W.P. Kuala Lumpur",
+    "60": "Born abroad", "61": "Born abroad", "62": "Born abroad",
+    "63": "Born abroad", "64": "Born abroad", "65": "Born abroad",
+    "66": "Born abroad", "67": "Born abroad", "68": "Born abroad",
+    "69": "Born abroad", "70": "Born abroad", "71": "Born abroad",
+    "72": "Born abroad", "73": "Born abroad", "74": "Born abroad",
+    "75": "Born abroad", "76": "Born abroad", "77": "Born abroad",
+    "78": "Born abroad", "79": "Born abroad",
+    "82": "Born abroad", "83": "Born abroad",
+  };
+  return states[code] || null;
+}
+
 export function getAgeFromBirthDate(birthDate: Date): number {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
@@ -122,6 +162,7 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["seller", "collector"]),
   vehicleType: z.string().optional(),
+  gender: z.enum(["male", "female"]).optional(),
   icNumber: z.string()
     .refine((val) => {
       const cleaned = val.replace(/[-\s]/g, "");

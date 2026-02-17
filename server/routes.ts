@@ -111,13 +111,18 @@ export async function registerRoutes(
         role: assignedRole,
         phone: data.phone,
         vehicleType: data.vehicleType || null,
+        gender: data.gender || null,
         icNumber: normalizedIc,
         icFrontPhoto: data.icFrontPhoto,
         icBackPhoto: data.icBackPhoto,
         verificationStatus: "pending",
       });
       const safeUser = { ...user, password: undefined };
-      (req as any).login({ claims: { sub: userId, email: data.email, first_name: data.firstName, last_name: data.lastName } }, (err: any) => {
+      const sessionUser = {
+        claims: { sub: userId, email: data.email, first_name: data.firstName, last_name: data.lastName },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
+      };
+      (req as any).login(sessionUser, (err: any) => {
         if (err) return res.status(500).json({ message: "Registration succeeded but auto-login failed" });
         res.status(201).json(safeUser);
       });

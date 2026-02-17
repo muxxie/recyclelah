@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   balance: decimal("balance", { precision: 10, scale: 2 }).default("0"),
   googleId: varchar("google_id").unique(),
+  gender: varchar("gender", { length: 10 }),
   icNumber: text("ic_number"),
   icFrontPhoto: text("ic_front_photo"),
   icBackPhoto: text("ic_back_photo"),

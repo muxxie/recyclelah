@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { registerSchema, parseIcBirthDate, getAgeFromBirthDate } from "@shared/schema";
+import { registerSchema, parseIcBirthDate, getAgeFromBirthDate, parseIcGender, parseIcStateCode } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
-  const [icInfo, setIcInfo] = useState<{ birthDate: Date; age: number } | null>(null);
+  const [icInfo, setIcInfo] = useState<{ birthDate: Date; age: number; gender: "male" | "female" | null; state: string | null } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -48,6 +48,7 @@ export default function AuthPage() {
       password: "",
       role: "seller",
       vehicleType: "",
+      gender: undefined,
       icNumber: "",
       icFrontPhoto: "",
       icBackPhoto: "",
@@ -353,8 +354,13 @@ export default function AuthPage() {
                                       if (raw.length > 8) formatted = raw.substring(0, 6) + "-" + raw.substring(6, 8) + "-" + raw.substring(8);
                                       field.onChange(formatted);
                                       const bd = parseIcBirthDate(formatted);
+                                      const gender = parseIcGender(formatted);
+                                      const state = parseIcStateCode(formatted);
                                       if (bd) {
-                                        setIcInfo({ birthDate: bd, age: getAgeFromBirthDate(bd) });
+                                        setIcInfo({ birthDate: bd, age: getAgeFromBirthDate(bd), gender, state });
+                                        if (gender) {
+                                          registerForm.setValue("gender", gender);
+                                        }
                                       } else {
                                         setIcInfo(null);
                                       }
@@ -363,13 +369,27 @@ export default function AuthPage() {
                                   />
                                 </FormControl>
                                 {icInfo && (
-                                  <div className={`text-xs mt-1 flex items-center gap-2 ${icInfo.age >= 18 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                                    <span data-testid="text-ic-birthdate">
-                                      Born: {icInfo.birthDate.toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
-                                    </span>
-                                    <span data-testid="text-ic-age">
-                                      ({icInfo.age} years old{icInfo.age < 18 ? " - must be 18+" : ""})
-                                    </span>
+                                  <div className="mt-2 space-y-1">
+                                    <div className={`text-xs flex items-center gap-2 ${icInfo.age >= 18 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                      <span data-testid="text-ic-birthdate">
+                                        Born: {icInfo.birthDate.toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                      <span data-testid="text-ic-age">
+                                        ({icInfo.age} years old{icInfo.age < 18 ? " - must be 18+" : ""})
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                      {icInfo.gender && (
+                                        <span data-testid="text-ic-gender" className="capitalize">
+                                          Gender: <span className="font-medium text-foreground">{icInfo.gender}</span>
+                                        </span>
+                                      )}
+                                      {icInfo.state && (
+                                        <span data-testid="text-ic-state">
+                                          State: <span className="font-medium text-foreground">{icInfo.state}</span>
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                                 <FormMessage />
@@ -461,6 +481,16 @@ export default function AuthPage() {
                               <div className="p-3 bg-muted/50 rounded-md">
                                 <p className="text-xs text-muted-foreground">IC Number</p>
                                 <p className="font-medium" data-testid="review-ic-number">{registerForm.getValues("icNumber")}</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="p-3 bg-muted/50 rounded-md">
+                                <p className="text-xs text-muted-foreground">Gender</p>
+                                <p className="font-medium capitalize" data-testid="review-gender">{registerForm.getValues("gender") || "—"}</p>
+                              </div>
+                              <div className="p-3 bg-muted/50 rounded-md">
+                                <p className="text-xs text-muted-foreground">State of Birth</p>
+                                <p className="font-medium" data-testid="review-state">{icInfo?.state || "—"}</p>
                               </div>
                             </div>
                             <div className="p-3 bg-muted/50 rounded-md">
