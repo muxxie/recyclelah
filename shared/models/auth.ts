@@ -27,9 +27,13 @@ export const users = pgTable("users", {
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   balance: decimal("balance", { precision: 10, scale: 2 }).default("0"),
+  googleId: varchar("google_id").unique(),
+  icNumber: text("ic_number"),
   icFrontPhoto: text("ic_front_photo"),
   icBackPhoto: text("ic_back_photo"),
   verificationStatus: varchar("verification_status", { length: 20 }).default("unverified").notNull(),
+  banned: boolean("banned").default(false).notNull(),
+  banReason: text("ban_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

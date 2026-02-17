@@ -97,6 +97,7 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["seller", "collector"]),
   vehicleType: z.string().optional(),
+  icNumber: z.string().min(12, "IC number must be 12 digits").max(14, "IC number too long"),
   icFrontPhoto: z.string().min(1, "IC front photo is required"),
   icBackPhoto: z.string().min(1, "IC back photo is required"),
 });
