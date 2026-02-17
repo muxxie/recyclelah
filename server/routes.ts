@@ -281,7 +281,14 @@ export async function registerRoutes(
       }
 
       const updatedUser = await storage.getUser(userId);
-      res.json({ message: "Verified successfully", user: { ...updatedUser, password: undefined } });
+
+      if (updatedUser && updatedUser.phoneVerified && updatedUser.emailVerified && updatedUser.verificationStatus !== "verified") {
+        await storage.updateUser(userId, { verificationStatus: "verified" });
+        const fullyVerified = await storage.getUser(userId);
+        return res.json({ message: "Account fully verified! You now have full access.", user: { ...fullyVerified, password: undefined }, accountVerified: true });
+      }
+
+      res.json({ message: "Verified successfully", user: { ...updatedUser, password: undefined }, accountVerified: false });
     } catch (error: any) {
       console.error("OTP verify error:", error);
       res.status(500).json({ message: "Verification failed" });
@@ -292,7 +299,12 @@ export async function registerRoutes(
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json({ phoneVerified: user.phoneVerified, emailVerified: user.emailVerified });
+    res.json({
+      phoneVerified: user.phoneVerified,
+      emailVerified: user.emailVerified,
+      verificationStatus: user.verificationStatus,
+      accountVerified: user.verificationStatus === "verified",
+    });
   });
 
   // ===== IC Upload via Object Storage =====
@@ -468,6 +480,11 @@ export async function registerRoutes(
 
   app.post("/api/requests", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.verificationStatus !== "verified") {
+      return res.status(403).json({ message: "Account not verified. Please complete phone and email verification first.", requiresVerification: true });
+    }
     try {
       const data = insertRequestSchema.parse(req.body);
       const request = await storage.createRequest({
@@ -507,6 +524,9 @@ export async function registerRoutes(
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
     if (!user || user.role !== "collector") return res.status(403).send();
+    if (user.verificationStatus !== "verified") {
+      return res.status(403).json({ message: "Account not verified. Please complete phone and email verification first.", requiresVerification: true });
+    }
 
     const id = Number(req.params.id);
     const request = await storage.getRequest(id);
@@ -612,24 +632,32 @@ export async function registerRoutes(
 
   app.post("/api/wallet/topup", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.verificationStatus !== "verified") {
+      return res.status(403).json({ message: "Account not verified. Please complete phone and email verification first.", requiresVerification: true });
+    }
     const { amount } = req.body;
     if (!amount || Number(amount) <= 0) return res.status(400).json({ message: "Invalid amount" });
 
-    const user = await storage.updateUserBalance(userId, Number(amount));
+    const topupUser = await storage.updateUserBalance(userId, Number(amount));
     await storage.createWalletTransaction({
       userId,
       type: "topup",
       amount: String(Number(amount).toFixed(2)),
       description: "Wallet top-up via FPX",
     });
-    res.json(user);
+    res.json(topupUser);
   });
 
   app.post("/api/wallet/withdraw", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const { amount } = req.body;
     const user = await storage.getUser(userId);
     if (!user) return res.status(404).send();
+    if (user.verificationStatus !== "verified") {
+      return res.status(403).json({ message: "Account not verified. Please complete phone and email verification first.", requiresVerification: true });
+    }
+    const { amount } = req.body;
     if (!amount || Number(amount) <= 0) return res.status(400).json({ message: "Invalid amount" });
     if (Number(user.balance) < Number(amount)) return res.status(400).json({ message: "Insufficient balance" });
 

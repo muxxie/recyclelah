@@ -16,6 +16,7 @@ import { useGeolocation } from "@/hooks/use-geo";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Link } from "wouter";
+import { VerificationBanner, useIsVerified } from "@/components/verification-banner";
 
 function CreateRequestDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { mutate, isPending } = useCreateRequest();
@@ -143,6 +144,7 @@ export default function SellerDashboard() {
   const { user } = useAuth();
   const { data: requests, isLoading } = useRequests();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const isVerified = useIsVerified();
 
   if (isLoading) return <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
@@ -152,6 +154,8 @@ export default function SellerDashboard() {
 
   return (
     <div className="space-y-6">
+      <VerificationBanner />
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground" data-testid="text-welcome">
@@ -159,7 +163,7 @@ export default function SellerDashboard() {
           </h1>
           <p className="text-muted-foreground text-sm">Manage your recycling pickups</p>
         </div>
-        <Button data-testid="button-new-request" onClick={() => setIsDialogOpen(true)} className="gap-2">
+        <Button data-testid="button-new-request" onClick={() => setIsDialogOpen(true)} className="gap-2" disabled={!isVerified}>
           <Plus className="w-4 h-4" />
           New Request
         </Button>

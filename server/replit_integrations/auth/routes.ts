@@ -17,6 +17,10 @@ export function registerAuthRoutes(app: Express): void {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
+      if (user.phoneVerified && user.emailVerified && user.verificationStatus !== "verified") {
+        await db.update(users).set({ verificationStatus: "verified" }).where(eq(users.id, user.id));
+        user = { ...user, verificationStatus: "verified" };
+      }
       const { password, ...safeUser } = user;
       res.json(safeUser);
     } catch (error) {

@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { WalletTransaction } from "@shared/schema";
+import { VerificationBanner, useIsVerified } from "@/components/verification-banner";
 
 const txTypeLabels: Record<string, string> = {
   topup: "Top Up",
@@ -150,6 +151,7 @@ export default function WalletPage() {
   const [showTopUp, setShowTopUp] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const isVerified = useIsVerified();
 
   const { data: transactions, isLoading } = useQuery<WalletTransaction[]>({
     queryKey: ["/api/wallet/transactions"],
@@ -176,6 +178,8 @@ export default function WalletPage() {
     <div className="space-y-6">
       <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-wallet-title">Wallet</h1>
 
+      <VerificationBanner />
+
       <Card className="bg-primary text-primary-foreground">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -186,7 +190,7 @@ export default function WalletPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setShowTopUp(true)} data-testid="button-topup" className="gap-1">
+              <Button variant="secondary" onClick={() => setShowTopUp(true)} data-testid="button-topup" className="gap-1" disabled={!isVerified}>
                 <ArrowDownLeft className="w-4 h-4" />
                 Top Up
               </Button>
@@ -198,6 +202,7 @@ export default function WalletPage() {
                   if (amt && Number(amt) > 0) withdrawMutation.mutate(Number(amt));
                 }}
                 data-testid="button-withdraw"
+                disabled={!isVerified}
               >
                 <ArrowUpRight className="w-4 h-4" />
                 Withdraw

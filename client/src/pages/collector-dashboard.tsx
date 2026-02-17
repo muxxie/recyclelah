@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { VerificationBanner, useIsVerified } from "@/components/verification-banner";
 
 function CompleteJobDialog({
   requestId,
@@ -108,6 +109,7 @@ export default function CollectorDashboard() {
   const { mutate: acceptRequest } = useAcceptRequest();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const isVerified = useIsVerified();
 
   const [isOnline, setIsOnline] = useState(user?.isOnline || false);
   const [completeJobId, setCompleteJobId] = useState<number | null>(null);
@@ -141,6 +143,8 @@ export default function CollectorDashboard() {
 
   return (
     <div className="space-y-6">
+      <VerificationBanner />
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-collector-welcome">
@@ -152,7 +156,7 @@ export default function CollectorDashboard() {
           <span className={`text-sm font-medium ${isOnline ? "text-primary" : "text-muted-foreground"}`} data-testid="text-online-status">
             {isOnline ? "Online" : "Offline"}
           </span>
-          <Switch data-testid="switch-online" checked={isOnline} onCheckedChange={toggleOnline} />
+          <Switch data-testid="switch-online" checked={isOnline} onCheckedChange={toggleOnline} disabled={!isVerified} />
         </div>
       </div>
 

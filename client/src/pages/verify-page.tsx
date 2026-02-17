@@ -14,7 +14,7 @@ export default function VerifyPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: otpStatus, isLoading: statusLoading } = useQuery<{ phoneVerified: boolean; emailVerified: boolean }>({
+  const { data: otpStatus, isLoading: statusLoading } = useQuery<{ phoneVerified: boolean; emailVerified: boolean; accountVerified: boolean; verificationStatus: string }>({
     queryKey: ["/api/otp/status"],
     enabled: !!user,
   });
@@ -23,13 +23,14 @@ export default function VerifyPage() {
 
   useEffect(() => {
     if (allVerified) {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       const timer = setTimeout(() => {
         const isAdmin = user?.role === "admin" || user?.role === "super_admin";
         setLocation(isAdmin ? "/admin" : user?.role === "collector" ? "/collector" : "/dashboard");
-      }, 2000);
+      }, 2500);
       return () => clearTimeout(timer);
     }
-  }, [allVerified, user, setLocation]);
+  }, [allVerified, user, setLocation, queryClient]);
 
   if (statusLoading) {
     return (
@@ -54,8 +55,8 @@ export default function VerifyPage() {
           <Card>
             <CardContent className="pt-6 text-center space-y-3">
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-              <h2 className="text-lg font-semibold">All Verified!</h2>
-              <p className="text-sm text-muted-foreground">Redirecting to your dashboard...</p>
+              <h2 className="text-lg font-semibold" data-testid="text-all-verified">Account Verified!</h2>
+              <p className="text-sm text-muted-foreground">Your account now has full access. Redirecting to your dashboard...</p>
             </CardContent>
           </Card>
         ) : (
@@ -79,17 +80,23 @@ export default function VerifyPage() {
               onVerified={() => queryClient.invalidateQueries({ queryKey: ["/api/otp/status"] })}
             />
 
-            <Button
-              variant="ghost"
-              className="w-full text-muted-foreground"
-              onClick={() => {
-                const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-                setLocation(isAdmin ? "/admin" : user?.role === "collector" ? "/collector" : "/dashboard");
-              }}
-              data-testid="button-skip-verification"
-            >
-              Skip for now <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Verification is required to schedule pickups, top up your wallet, and sell recyclables.
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => {
+                  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+                  setLocation(isAdmin ? "/admin" : user?.role === "collector" ? "/collector" : "/dashboard");
+                }}
+                data-testid="button-skip-verification"
+              >
+                Continue with limited access <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </>
         )}
       </div>
