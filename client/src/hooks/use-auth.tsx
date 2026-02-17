@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { User } from "@shared/models/auth";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
   user: User | null;
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const { data: user, isLoading, error } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
@@ -30,32 +32,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (credentials: any) => {
-      const res = await fetch("/api/login", {
+    mutationFn: async (credentials: { email: string; password: string }) => {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
       });
-      if (!res.ok) throw new Error("Login failed");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Login failed");
+      }
       return res.json();
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
     }
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (credentials: any) => {
+    mutationFn: async (data: any) => {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Registration failed");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Registration failed");
+      }
       return res.json();
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
+      toast({ title: "Account Created", description: "Your IC is pending verification." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
     }
   });
 

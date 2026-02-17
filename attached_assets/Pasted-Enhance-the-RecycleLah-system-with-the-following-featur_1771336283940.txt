@@ -1,0 +1,119 @@
+Enhance the RecycleLah system with the following features. All new components must be mobile-first, secure, and integrated with the existing SELLER, COLLECTOR, and ADMIN flows.
+
+===========================
+GOOGLE LOGIN (GMAIL OAUTH)
+===========================
+1. Add Google OAuth login using a standard OAuth provider (e.g., Google Identity Services).
+2. When a user logs in with Gmail:
+   - Capture: email, name, Google ID.
+   - If user is new, redirect to onboarding to choose role (SELLER or COLLECTOR) and enter phone number + IC verification.
+   - If user already exists, log them in immediately.
+
+3. Store Google users in the same user table with fields:
+   - email
+   - googleId
+   - role
+   - phone
+   - icNumber (encrypted)
+   - verificationStatus
+   - banned: true/false
+
+4. If a user tries to register with Gmail but:
+   - IC number already exists → block registration
+   - Email already exists → block registration
+   - Phone number already exists → block registration
+
+Return a clear error message:
+“Account already exists. Please log in instead.”
+
+===========================
+DUPLICATE PREVENTION RULES
+===========================
+Before creating ANY new account (email login or Gmail login):
+- Check if IC number exists (encrypted match)
+- Check if email exists
+- Check if phone number exists
+If any match → reject registration.
+
+===========================
+ADMIN DETECTION (EMAIL-BASED)
+===========================
+1. Add an environment variable: ADMIN_EMAILS
+   - Example: “admin@recyclelah.com, hafiz@hazkilgroup.com”
+
+2. When a user logs in:
+   - If their email matches ADMIN_EMAILS → assign role = “ADMIN”
+   - Admins bypass seller/collector UI and go directly to admin dashboard.
+
+3. Admin accounts must NOT require IC verification.
+
+===========================
+ADMIN DASHBOARD (RESPONSIVE)
+===========================
+Create a full admin dashboard with:
+- Overview stats (users, jobs, transactions)
+- User list with filters
+- View user details (email, phone, IC verification status)
+- BAN / UNBAN button
+- View banned accounts
+- Job list (active, completed, cancelled)
+- Wallet balances + escrow ledger
+- Approve withdrawal requests
+- Adjust recycling prices
+- View IC front/back images for verification
+
+UI Requirements:
+- Desktop-first but responsive for mobile
+- Clean tables, filters, and action buttons
+- Admin-only routes protected by middleware
+
+===========================
+BAN SYSTEM
+===========================
+1. Add field: banned: true/false in user model.
+2. If banned = true:
+   - User cannot log in
+   - API returns: “Your account has been banned for violating T&C.”
+3. Admin dashboard includes:
+   - Ban user
+   - Unban user
+   - Reason for ban (optional)
+
+===========================
+SECURITY REQUIREMENTS
+===========================
+- Protect admin routes with middleware checking role = ADMIN.
+- Encrypt IC numbers.
+- Never store IC images in Replit DB.
+- Use secure storage (Supabase/Firebase) for IC images.
+- Validate Google OAuth tokens server-side.
+
+===========================
+UI REQUIREMENTS (MOBILE-FIRST)
+===========================
+- Google Login button on login page
+- Simple onboarding flow after Gmail login
+- Responsive layout for seller/collector/admin dashboards
+- Clear error messages for duplicate accounts
+
+===========================
+DELIVERABLES
+===========================
+1. Google OAuth login flow
+2. Duplicate-prevention logic (IC, email, phone)
+3. Admin detection by email
+4. Admin dashboard with ban/unban controls
+5. Middleware for admin-only routes
+6. Updated user model
+7. Updated login/register UI
+8. Mobile-first responsive design
+
+===========================
+BEGIN IMPLEMENTATION NOW
+===========================
+Start by:
+1. Updating user model
+2. Adding Google OAuth routes
+3. Adding duplicate-prevention logic
+4. Creating admin middleware
+5. Building admin dashboard UI

@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api } from "@shared/routes";
+import { registerSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,51 +10,74 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import { Leaf } from "lucide-react";
-import { useEffect } from "react";
+import { Leaf, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ICCameraCapture } from "@/components/ic-camera-capture";
 
 const loginSchema = z.object({
-  username: z.string().min(3),
-  password: z.string().min(6),
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
-
-const registerSchema = api.auth.register.input;
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [, setLocation] = useLocation();
+  const [step, setStep] = useState(1);
 
   useEffect(() => {
     if (user) {
-      setLocation(user.role === 'collector' ? '/collector' : '/dashboard');
+      if (user.role === 'admin') setLocation('/admin');
+      else if (user.role === 'collector') setLocation('/collector');
+      else setLocation('/dashboard');
     }
   }, [user, setLocation]);
 
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
-  const registerForm = useForm({
+  const registerForm = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      username: "",
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
       password: "",
       role: "seller",
-      phone: "",
-      address: "",
       vehicleType: "",
+      icFrontPhoto: "",
+      icBackPhoto: "",
     },
   });
 
-  // Watch role to conditionally show fields
   const role = registerForm.watch("role");
+  const icFront = registerForm.watch("icFrontPhoto");
+  const icBack = registerForm.watch("icBackPhoto");
+
+  const canGoToStep2 = () => {
+    const vals = registerForm.getValues();
+    return vals.firstName.length >= 1 && vals.lastName.length >= 1 && vals.email.includes("@") && vals.phone.length >= 10 && vals.password.length >= 6;
+  };
+
+  const canGoToStep3 = () => {
+    return icFront.length > 0 && icBack.length > 0;
+  };
+
+  const handleNextStep = async () => {
+    if (step === 1) {
+      const valid = await registerForm.trigger(["firstName", "lastName", "email", "phone", "password", "role"]);
+      if (valid) setStep(2);
+    } else if (step === 2) {
+      if (canGoToStep3()) setStep(3);
+    }
+  };
 
   if (user) return null;
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
-      {/* Left Panel - Hero */}
       <div className="hidden lg:flex flex-col justify-center p-12 bg-[#449e63] text-white relative overflow-hidden">
         <div className="relative z-10 max-w-lg">
           <div className="flex items-center gap-2 text-2xl font-display font-bold mb-12">
@@ -68,13 +91,11 @@ export default function AuthPage() {
             Join thousands of users making the planet greener. Connect with collectors, schedule pickups, and earn rewards for recycling.
           </p>
         </div>
-
         <div className="absolute bottom-12 left-12 z-10 text-sm opacity-60">
-          © 2024 RecycleLah. Making the world cleaner.
+          &copy; 2024 RecycleLah. Making the world cleaner.
         </div>
       </div>
 
-      {/* Right Panel - Forms */}
       <div className="flex items-center justify-center p-6 bg-background">
         <div className="w-full max-w-md space-y-6">
           <div className="lg:hidden flex items-center gap-2 justify-center mb-8">
@@ -84,8 +105,8 @@ export default function AuthPage() {
 
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
+              <TabsTrigger value="register" data-testid="tab-register" onClick={() => setStep(1)}>Register</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
@@ -95,28 +116,56 @@ export default function AuthPage() {
                   <CardDescription>Sign in to manage your recycling activities</CardDescription>
                 </CardHeader>
                 <CardContent className="px-0">
-                  <div className="space-y-4">
-                    <Button 
-                      className="w-full h-12 text-base font-medium flex items-center justify-center gap-2 bg-[#449e63] hover:bg-[#3d8d58] text-white rounded-md" 
-                      onClick={() => window.location.href = "/replit/auth"}
-                    >
-                      Log In with Replit
-                      <span className="text-xl">→</span>
-                    </Button>
-                    <div className="relative py-4">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-muted" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground tracking-widest">
-                          Secure Authentication
-                        </span>
-                      </div>
+                  <Form {...loginForm}>
+                    <form onSubmit={loginForm.handleSubmit((d) => loginMutation.mutate(d))} className="space-y-4">
+                      <FormField
+                        control={loginForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="your@email.com" {...field} data-testid="input-login-email" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={loginForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="Enter your password" {...field} data-testid="input-login-password" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button className="w-full text-base font-medium mt-2" type="submit" disabled={loginMutation.isPending} data-testid="button-login">
+                        {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                      </Button>
+                    </form>
+                  </Form>
+
+                  <div className="relative py-4 mt-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-muted" />
                     </div>
-                    <p className="text-center text-sm text-muted-foreground">
-                      New here? Creating an account takes seconds.
-                    </p>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground tracking-widest">or</span>
+                    </div>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="w-full text-base font-medium"
+                    onClick={() => window.location.href = "/replit/auth"}
+                    data-testid="button-replit-login"
+                  >
+                    Log In with Replit
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -124,95 +173,282 @@ export default function AuthPage() {
             <TabsContent value="register">
               <Card className="border-none shadow-none">
                 <CardHeader className="px-0">
-                  <CardTitle className="text-2xl font-display">Create an account</CardTitle>
-                  <CardDescription>Start your recycling journey today</CardDescription>
+                  <CardTitle className="text-2xl font-display">
+                    {step === 1 && "Create your account"}
+                    {step === 2 && "Verify your identity"}
+                    {step === 3 && "Review & Submit"}
+                  </CardTitle>
+                  <CardDescription>
+                    {step === 1 && "Fill in your personal details"}
+                    {step === 2 && "Take a photo of your Malaysian IC (front & back)"}
+                    {step === 3 && "Confirm your details before submitting"}
+                  </CardDescription>
+                  <div className="flex gap-2 mt-3">
+                    {[1, 2, 3].map(s => (
+                      <div
+                        key={s}
+                        className={`h-1.5 flex-1 rounded-full transition-colors ${s <= step ? "bg-[#449e63]" : "bg-muted"}`}
+                        data-testid={`step-indicator-${s}`}
+                      />
+                    ))}
+                  </div>
                 </CardHeader>
                 <CardContent className="px-0">
                   <Form {...registerForm}>
-                    <form onSubmit={registerForm.handleSubmit((d) => registerMutation.mutate(d as any))} className="space-y-4">
-                      <FormField
-                        control={registerForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Choose a username" {...field} className="h-12" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={registerForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="Create a password" {...field} className="h-12" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={registerForm.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>I am a...</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger className="h-12">
-                                  <SelectValue placeholder="Select your role" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="seller">Household / Seller</SelectItem>
-                                <SelectItem value="collector">Collector</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {role === 'collector' && (
-                        <FormField
-                          control={registerForm.control}
-                          name="vehicleType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Vehicle Type</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g. Van, Truck, Bike" {...field} className="h-12" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
+                    <form
+                      onSubmit={registerForm.handleSubmit((d) => registerMutation.mutate(d))}
+                      className="space-y-4"
+                    >
+                      {step === 1 && (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={registerForm.control}
+                              name="firstName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>First Name</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Ali" {...field} data-testid="input-first-name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={registerForm.control}
+                              name="lastName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Last Name</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Ahmad" {...field} data-testid="input-last-name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <FormField
+                            control={registerForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email Address</FormLabel>
+                                <FormControl>
+                                  <Input type="email" placeholder="ali@example.com" {...field} data-testid="input-reg-email" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="0121234567" {...field} data-testid="input-reg-phone" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                  <Input type="password" placeholder="At least 6 characters" {...field} data-testid="input-reg-password" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="role"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>I am a...</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-role">
+                                      <SelectValue placeholder="Select your role" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="seller">Household / Seller</SelectItem>
+                                    <SelectItem value="collector">Collector</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          {role === "collector" && (
+                            <FormField
+                              control={registerForm.control}
+                              name="vehicleType"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Vehicle Type</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g. Van, Truck, Motorcycle" {...field} data-testid="input-vehicle-type" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           )}
-                        />
+                          <Button
+                            type="button"
+                            className="w-full text-base font-medium mt-2"
+                            onClick={handleNextStep}
+                            data-testid="button-next-step1"
+                          >
+                            Next: IC Verification <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </>
                       )}
 
-                      {role === 'seller' && (
-                         <FormField
-                          control={registerForm.control}
-                          name="phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="+60..." {...field} className="h-12" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      {step === 2 && (
+                        <>
+                          <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md mb-2">
+                            <ShieldCheck className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-sm text-amber-800 dark:text-amber-200">
+                              <p className="font-medium">Malaysian IC Required</p>
+                              <p className="mt-1 opacity-80">Please use your camera to capture clear photos of the front and back of your MyKad/IC. This is required for account verification.</p>
+                            </div>
+                          </div>
+
+                          <FormField
+                            control={registerForm.control}
+                            name="icFrontPhoto"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <ICCameraCapture
+                                    label="IC Front (MyKad - Front Side)"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    testId="ic-front-capture"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={registerForm.control}
+                            name="icBackPhoto"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <ICCameraCapture
+                                    label="IC Back (MyKad - Back Side)"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    testId="ic-back-capture"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="flex gap-3 mt-4">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => setStep(1)}
+                              data-testid="button-back-step2"
+                            >
+                              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                            </Button>
+                            <Button
+                              type="button"
+                              className="flex-1"
+                              onClick={handleNextStep}
+                              disabled={!canGoToStep3()}
+                              data-testid="button-next-step2"
+                            >
+                              Next: Review <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                          </div>
+                        </>
                       )}
 
-                      <Button className="w-full h-12 text-base font-medium mt-4" type="submit" disabled={registerMutation.isPending}>
-                        {registerMutation.isPending ? "Creating account..." : "Create Account"}
-                      </Button>
+                      {step === 3 && (
+                        <>
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="p-3 bg-muted/50 rounded-md">
+                                <p className="text-xs text-muted-foreground">First Name</p>
+                                <p className="font-medium" data-testid="review-first-name">{registerForm.getValues("firstName")}</p>
+                              </div>
+                              <div className="p-3 bg-muted/50 rounded-md">
+                                <p className="text-xs text-muted-foreground">Last Name</p>
+                                <p className="font-medium" data-testid="review-last-name">{registerForm.getValues("lastName")}</p>
+                              </div>
+                            </div>
+                            <div className="p-3 bg-muted/50 rounded-md">
+                              <p className="text-xs text-muted-foreground">Email</p>
+                              <p className="font-medium" data-testid="review-email">{registerForm.getValues("email")}</p>
+                            </div>
+                            <div className="p-3 bg-muted/50 rounded-md">
+                              <p className="text-xs text-muted-foreground">Phone</p>
+                              <p className="font-medium" data-testid="review-phone">{registerForm.getValues("phone")}</p>
+                            </div>
+                            <div className="p-3 bg-muted/50 rounded-md">
+                              <p className="text-xs text-muted-foreground">Role</p>
+                              <p className="font-medium capitalize" data-testid="review-role">{registerForm.getValues("role")}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">IC Front</p>
+                                <img src={icFront} alt="IC Front" className="w-full h-20 object-cover rounded-md border" data-testid="review-ic-front" />
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">IC Back</p>
+                                <img src={icBack} alt="IC Back" className="w-full h-20 object-cover rounded-md border" data-testid="review-ic-back" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md mt-2">
+                            <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                              Your IC will be reviewed by our team for verification. You can start using the app immediately while verification is in progress.
+                            </p>
+                          </div>
+
+                          <div className="flex gap-3 mt-4">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => setStep(2)}
+                              data-testid="button-back-step3"
+                            >
+                              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                            </Button>
+                            <Button
+                              type="submit"
+                              className="flex-1"
+                              disabled={registerMutation.isPending}
+                              data-testid="button-create-account"
+                            >
+                              {registerMutation.isPending ? "Creating..." : "Create Account"}
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </form>
                   </Form>
                 </CardContent>

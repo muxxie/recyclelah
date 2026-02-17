@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Users, Package, DollarSign, TrendingUp, Scale } from "lucide-react";
+import { Loader2, Users, Package, DollarSign, TrendingUp, Scale, ShieldCheck, ShieldX, ShieldAlert, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type { User } from "@shared/models/auth";
 import type { Request, WalletTransaction, MarketPrice } from "@shared/schema";
 
@@ -41,10 +42,18 @@ function StatsCards({ stats }: { stats: any }) {
   );
 }
 
+function VerificationBadge({ status }: { status: string }) {
+  if (status === "verified") return <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800"><ShieldCheck className="w-3 h-3 mr-1" />Verified</Badge>;
+  if (status === "rejected") return <Badge variant="outline" className="text-[10px] bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800"><ShieldX className="w-3 h-3 mr-1" />Rejected</Badge>;
+  if (status === "pending") return <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"><ShieldAlert className="w-3 h-3 mr-1" />Pending</Badge>;
+  return <Badge variant="outline" className="text-[10px]">Unverified</Badge>;
+}
+
 function UsersTab() {
   const { data: users, isLoading } = useQuery<User[]>({ queryKey: ["/api/admin/users"] });
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
 
   const updateRole = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: string }) => {
@@ -57,37 +66,126 @@ function UsersTab() {
     },
   });
 
+  const verifyUser = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/verify`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setViewingUser(null);
+      toast({ title: "Verification Updated" });
+    },
+  });
+
   if (isLoading) return <Loader2 className="animate-spin text-primary mx-auto" />;
 
   return (
-    <div className="space-y-2">
-      {users?.map((u) => (
-        <Card key={u.id}>
-          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-medium text-sm truncate" data-testid={`text-user-name-${u.id}`}>
-                {u.firstName ? `${u.firstName} ${u.lastName || ""}` : u.username || u.email || u.id}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{u.email || "No email"}</p>
+    <>
+      <div className="space-y-2">
+        {users?.map((u) => (
+          <Card key={u.id}>
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate" data-testid={`text-user-name-${u.id}`}>
+                  {u.firstName ? `${u.firstName} ${u.lastName || ""}` : u.username || u.email || u.id}
+                </p>
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                  <p className="text-xs text-muted-foreground truncate">{u.email || "No email"}</p>
+                  {u.phone && <p className="text-xs text-muted-foreground">| {u.phone}</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <VerificationBadge status={u.verificationStatus} />
+                <Badge variant="outline" className="text-xs capitalize">{u.role}</Badge>
+                <p className="text-xs font-medium">RM {Number(u.balance || 0).toFixed(2)}</p>
+                {(u.icFrontPhoto || u.icBackPhoto) && (
+                  <Button size="icon" variant="outline" onClick={() => setViewingUser(u)} data-testid={`button-view-ic-${u.id}`}>
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                )}
+                <Select defaultValue={u.role} onValueChange={(role) => updateRole.mutate({ id: u.id, role })}>
+                  <SelectTrigger className="w-28" data-testid={`select-role-${u.id}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="seller">Seller</SelectItem>
+                    <SelectItem value="collector">Collector</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={!!viewingUser} onOpenChange={() => setViewingUser(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>IC Verification - {viewingUser?.firstName} {viewingUser?.lastName}</DialogTitle>
+            <DialogDescription>Review the user's Malaysian IC photos for identity verification</DialogDescription>
+          </DialogHeader>
+          {viewingUser && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Name</p>
+                  <p className="font-medium">{viewingUser.firstName} {viewingUser.lastName}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="font-medium truncate">{viewingUser.email}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Phone</p>
+                  <p className="font-medium">{viewingUser.phone || "N/A"}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <VerificationBadge status={viewingUser.verificationStatus} />
+                </div>
+              </div>
+
+              {viewingUser.icFrontPhoto && (
+                <div>
+                  <p className="text-sm font-medium mb-1">IC Front (MyKad)</p>
+                  <img src={viewingUser.icFrontPhoto} alt="IC Front" className="w-full rounded-md border" data-testid="img-ic-front" />
+                </div>
+              )}
+              {viewingUser.icBackPhoto && (
+                <div>
+                  <p className="text-sm font-medium mb-1">IC Back (MyKad)</p>
+                  <img src={viewingUser.icBackPhoto} alt="IC Back" className="w-full rounded-md border" data-testid="img-ic-back" />
+                </div>
+              )}
+
+              {viewingUser.verificationStatus !== "verified" && (
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 text-red-600 border-red-200 dark:border-red-800"
+                    onClick={() => verifyUser.mutate({ id: viewingUser.id, status: "rejected" })}
+                    disabled={verifyUser.isPending}
+                    data-testid="button-reject-ic"
+                  >
+                    <ShieldX className="w-4 h-4 mr-2" /> Reject
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => verifyUser.mutate({ id: viewingUser.id, status: "verified" })}
+                    disabled={verifyUser.isPending}
+                    data-testid="button-approve-ic"
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-2" /> Approve
+                  </Button>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              <Badge variant="outline" className="text-xs capitalize">{u.role}</Badge>
-              <p className="text-xs font-medium">RM {Number(u.balance || 0).toFixed(2)}</p>
-              <Select defaultValue={u.role} onValueChange={(role) => updateRole.mutate({ id: u.id, role })}>
-                <SelectTrigger className="w-28" data-testid={`select-role-${u.id}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="seller">Seller</SelectItem>
-                  <SelectItem value="collector">Collector</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
