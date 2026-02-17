@@ -8,23 +8,46 @@ import { Loader2 } from "lucide-react";
 import AuthPage from "@/pages/auth-page";
 import SellerDashboard from "@/pages/seller-dashboard";
 import CollectorDashboard from "@/pages/collector-dashboard";
+import WalletPage from "@/pages/wallet-page";
 import MarketPage from "@/pages/market-page";
 import FacilitiesPage from "@/pages/facilities-page";
+import TrackingPage from "@/pages/tracking-page";
+import AdminDashboard from "@/pages/admin-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
+  const homeRedirect = !user ? "/" : user.role === "admin" ? "/admin" : user.role === "collector" ? "/collector" : "/dashboard";
+
   return (
     <LayoutShell>
       <Switch>
-        <Route path="/">{user ? (user.role === "collector" ? <Redirect to="/collector" /> : <Redirect to="/dashboard" />) : <AuthPage />}</Route>
-        <Route path="/dashboard">{!user ? <Redirect to="/" /> : <SellerDashboard />}</Route>
-        <Route path="/history">{!user ? <Redirect to="/" /> : <SellerDashboard />}</Route>
-        <Route path="/collector">{!user || user.role !== "collector" ? <Redirect to="/" /> : <CollectorDashboard />}</Route>
-        <Route path="/collector/my-jobs">{!user || user.role !== "collector" ? <Redirect to="/" /> : <CollectorDashboard />}</Route>
-        <Route path="/market" component={MarketPage} />
-        <Route path="/facilities" component={FacilitiesPage} />
+        <Route path="/">
+          {user ? <Redirect to={homeRedirect} /> : <AuthPage />}
+        </Route>
+        <Route path="/dashboard">
+          {!user ? <Redirect to="/" /> : user.role === "admin" ? <Redirect to="/admin" /> : <SellerDashboard />}
+        </Route>
+        <Route path="/collector">
+          {!user ? <Redirect to="/" /> : user.role !== "collector" ? <Redirect to={homeRedirect} /> : <CollectorDashboard />}
+        </Route>
+        <Route path="/wallet">
+          {!user ? <Redirect to="/" /> : <WalletPage />}
+        </Route>
+        <Route path="/tracking/:id">
+          {!user ? <Redirect to="/" /> : <TrackingPage />}
+        </Route>
+        <Route path="/admin">
+          {!user ? <Redirect to="/" /> : user.role !== "admin" ? <Redirect to={homeRedirect} /> : <AdminDashboard />}
+        </Route>
+        <Route path="/market">
+          {!user ? <Redirect to="/" /> : <MarketPage />}
+        </Route>
+        <Route path="/facilities">
+          {!user ? <Redirect to="/" /> : <FacilitiesPage />}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </LayoutShell>

@@ -83,7 +83,7 @@ export const walletTransactionsRelations = relations(walletTransactions, ({ one 
 export const insertRequestSchema = createInsertSchema(requests).omit({ 
   id: true, createdAt: true, completedAt: true, status: true,
   actualWeight: true, totalPayout: true, commissionAmount: true,
-  collectorId: true, facilityId: true, escrowAmount: true
+  collectorId: true, facilityId: true, escrowAmount: true, sellerId: true
 });
 export const insertFacilitySchema = createInsertSchema(facilities).omit({ id: true, createdAt: true });
 export const insertMarketPriceSchema = createInsertSchema(marketPrices).omit({ id: true, updatedAt: true });
@@ -97,3 +97,5 @@ export type MarketPrice = typeof marketPrices.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertFacility = z.infer<typeof insertFacilitySchema>;
+export type InsertMarketPrice = z.infer<typeof insertMarketPriceSchema>;

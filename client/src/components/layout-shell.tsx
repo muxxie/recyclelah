@@ -1,15 +1,18 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { 
-  Leaf, 
-  LayoutDashboard, 
-  MapPin, 
-  LogOut, 
-  Truck, 
-  History,
+import {
+  Leaf,
+  LayoutDashboard,
+  MapPin,
+  LogOut,
+  Truck,
+  Wallet,
+  BarChart3,
   Menu,
-  X
+  X,
+  TrendingUp,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,55 +24,70 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
-  const isCollector = user.role === 'collector';
+  const isAdmin = user.role === "admin";
+  const isCollector = user.role === "collector";
 
-  const links = isCollector ? [
-    { href: "/collector", label: "Available Jobs", icon: LayoutDashboard },
-    { href: "/collector/my-jobs", label: "My Jobs", icon: Truck },
-    { href: "/facilities", label: "Facilities", icon: MapPin },
-  ] : [
-    { href: "/dashboard", label: "New Request", icon: LayoutDashboard },
-    { href: "/history", label: "History", icon: History },
-    { href: "/market", label: "Market Prices", icon: Leaf },
-  ];
+  const links = isAdmin
+    ? [
+        { href: "/admin", label: "Dashboard", icon: ShieldCheck },
+        { href: "/market", label: "Market Prices", icon: TrendingUp },
+        { href: "/facilities", label: "Facilities", icon: MapPin },
+      ]
+    : isCollector
+    ? [
+        { href: "/collector", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/wallet", label: "Wallet", icon: Wallet },
+        { href: "/facilities", label: "Facilities", icon: MapPin },
+        { href: "/market", label: "Prices", icon: TrendingUp },
+      ]
+    : [
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/wallet", label: "Wallet", icon: Wallet },
+        { href: "/market", label: "Prices", icon: TrendingUp },
+        { href: "/facilities", label: "Facilities", icon: MapPin },
+      ];
 
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <header className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-50">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl font-display">
-          <Leaf className="w-6 h-6 fill-primary" />
+      <header className="md:hidden flex items-center justify-between p-3 bg-card border-b sticky top-0 z-50">
+        <div className="flex items-center gap-2 text-primary font-bold text-lg font-display">
+          <Leaf className="w-5 h-5 fill-primary" />
           RecycleLah!
         </div>
-        <Button variant="ghost" size="icon" onClick={toggleMenu}>
+        <Button variant="ghost" size="icon" onClick={toggleMenu} data-testid="button-mobile-menu">
           {isMobileMenuOpen ? <X /> : <Menu />}
         </Button>
       </header>
 
-      {/* Mobile Navigation Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden absolute top-16 left-0 right-0 bg-white border-b shadow-lg z-40 p-4 space-y-2"
+            exit={{ opacity: 0, y: -10 }}
+            className="md:hidden fixed top-[52px] left-0 right-0 bg-card border-b shadow-lg z-40 p-3 space-y-1"
           >
-            {links.map(link => (
+            {links.map((link) => (
               <Link key={link.href} href={link.href} onClick={() => setIsMobileMenuOpen(false)}>
-                <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location === link.href ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground/70 hover:bg-muted'}`}>
-                  <link.icon className="w-5 h-5" />
+                <div
+                  className={`flex items-center gap-3 p-3 rounded-md transition-colors ${
+                    location === link.href ? "bg-primary/10 text-primary font-semibold" : "text-foreground/70"
+                  }`}
+                  data-testid={`link-mobile-${link.label.toLowerCase().replace(/\s/g, "-")}`}
+                >
+                  <link.icon className="w-4 h-4" />
                   {link.label}
                 </div>
               </Link>
             ))}
-            <div className="pt-4 mt-2 border-t">
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+            <div className="pt-3 mt-2 border-t">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-destructive"
                 onClick={() => logoutMutation.mutate()}
+                data-testid="button-mobile-logout"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
@@ -79,47 +97,56 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-card border-r h-screen sticky top-0 p-6">
-        <div className="flex items-center gap-2 text-primary font-bold text-2xl font-display mb-8">
-          <Leaf className="w-8 h-8 fill-primary" />
+      <aside className="hidden md:flex flex-col w-56 bg-card border-r h-screen sticky top-0 p-4">
+        <div className="flex items-center gap-2 text-primary font-bold text-xl font-display mb-6">
+          <Leaf className="w-6 h-6 fill-primary" />
           RecycleLah!
         </div>
 
-        <nav className="space-y-2 flex-1">
-          {links.map(link => (
+        <nav className="space-y-1 flex-1">
+          {links.map((link) => (
             <Link key={link.href} href={link.href}>
-              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${location === link.href ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
-                <link.icon className="w-5 h-5" />
+              <div
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-all cursor-pointer text-sm ${
+                  location === link.href
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover-elevate"
+                }`}
+                data-testid={`link-sidebar-${link.label.toLowerCase().replace(/\s/g, "-")}`}
+              >
+                <link.icon className="w-4 h-4" />
                 <span className="font-medium">{link.label}</span>
               </div>
             </Link>
           ))}
         </nav>
 
-        <div className="pt-6 border-t mt-auto">
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-              {user.username.substring(0, 2).toUpperCase()}
+        <div className="pt-4 border-t mt-auto space-y-3">
+          <div className="flex items-center gap-2 px-2">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+              {(user.firstName || user.username || "U").substring(0, 2).toUpperCase()}
             </div>
             <div className="overflow-hidden">
-              <p className="font-medium text-sm truncate">{user.username}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+              <p className="font-medium text-xs truncate" data-testid="text-sidebar-username">
+                {user.firstName || user.username}
+              </p>
+              <p className="text-[10px] text-muted-foreground capitalize">{user.role}</p>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            className="w-full justify-start text-muted-foreground hover:text-destructive hover:border-destructive/30"
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start text-muted-foreground"
             onClick={() => logoutMutation.mutate()}
+            data-testid="button-sidebar-logout"
           >
-            <LogOut className="w-4 h-4 mr-2" />
+            <LogOut className="w-3.5 h-3.5 mr-2" />
             Sign Out
           </Button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto page-transition p-4 md:p-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto page-transition p-4 md:p-6 max-w-6xl mx-auto w-full">
         {children}
       </main>
     </div>
