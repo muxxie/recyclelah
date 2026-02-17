@@ -62,9 +62,12 @@ Preferred communication style: Simple, everyday language.
 - **Seed Data**: Facilities and market prices support seeding via `seedFacilities()` and `seedMarketPrices()` methods that only insert if tables are empty.
 - **Role-Based Views**: The frontend renders different dashboards based on user role (`seller`, `collector`, `admin`, `super_admin`). Routing guards redirect unauthorized users.
 - **Three-Tier Role System**: Users can be `seller`, `collector`, `admin`, or `super_admin`. Super admins (configured via `ADMIN_EMAILS` env var) can promote/demote admins. Admins can verify users, ban/unban non-admin users. Super admins can ban anyone except other super admins.
-- **IC Verification**: Malaysian IC number (YYMMDD-XX-XXXX format) validated for birth date and 18+ age. IC front/back photos captured via camera or file upload. Admin/super admin can approve or reject IC verification.
+- **IC Verification**: Malaysian IC number (YYMMDD-XX-XXXX format) validated for birth date and 18+ age. IC front/back photos captured via camera or file upload. Admin/super admin can approve or reject IC verification with notes.
+- **IC Encryption**: IC numbers are encrypted (AES-256-GCM) in database with a SHA-256 hash for lookup. Admin IC viewer decrypts for display.
+- **OTP Verification**: Phone (WhatsApp via Twilio - pending) and email (SendGrid - pending) verification with 6-digit OTP codes. Currently logs OTP to console for development. Rate-limited (60s), max 5 attempts, 10-min expiry.
+- **Object Storage**: Replit Object Storage for IC photo uploads via presigned URLs (private bucket). Routes: POST `/api/ic/upload-url`, POST `/api/ic/save-urls`.
 - **Ban System**: Admins can ban users with custom reasons. Banned users cannot log in and see the ban reason.
-- **Duplicate Prevention**: Email, phone, and IC number are checked for uniqueness during registration.
+- **Duplicate Prevention**: Email, phone, and IC number (via hash) are checked for uniqueness during registration.
 
 ## External Dependencies
 

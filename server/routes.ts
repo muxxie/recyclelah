@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertRequestSchema, registerSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { encryptText, decryptText, isEncrypted, maskIcNumber } from "./utils/encryption";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -91,8 +93,10 @@ export async function registerRoutes(
       }
 
       const normalizedIc = data.icNumber.replace(/[-\s]/g, "");
-      const existingIc = await storage.getUserByIcNumber(normalizedIc);
-      if (existingIc) {
+      const icLookupHash = crypto.createHash("sha256").update(normalizedIc).digest("hex");
+      const existingIcByHash = await storage.getUserByIcHash(icLookupHash);
+      const existingIcByPlain = await storage.getUserByIcNumber(normalizedIc);
+      if (existingIcByHash || existingIcByPlain) {
         return res.status(400).json({ message: "An account with this IC number already exists" });
       }
 
@@ -100,6 +104,8 @@ export async function registerRoutes(
       const userId = crypto.randomUUID();
 
       const assignedRole = isSuperAdminEmail(data.email) ? "super_admin" : data.role;
+
+      const encryptedIc = encryptText(normalizedIc);
 
       const user = await storage.createUser({
         id: userId,
@@ -112,7 +118,8 @@ export async function registerRoutes(
         phone: data.phone,
         vehicleType: data.vehicleType || null,
         gender: data.gender || null,
-        icNumber: normalizedIc,
+        icNumber: encryptedIc,
+        icHash: icLookupHash,
         icFrontPhoto: data.icFrontPhoto,
         icBackPhoto: data.icBackPhoto,
         verificationStatus: "pending",
@@ -175,6 +182,187 @@ export async function registerRoutes(
     }
   });
 
+  // ===== OTP: Send verification code =====
+  app.post("/api/otp/send", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { type, target } = req.body;
+
+      if (!type || !target) {
+        return res.status(400).json({ message: "Type and target are required" });
+      }
+      if (!["phone", "email"].includes(type)) {
+        return res.status(400).json({ message: "Type must be 'phone' or 'email'" });
+      }
+      if (type === "phone" && !/^\+?\d{10,15}$/.test(target.replace(/[\s-]/g, ""))) {
+        return res.status(400).json({ message: "Invalid phone number format" });
+      }
+      if (type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const existing = await storage.getLatestOtp(userId, type, target);
+      if (existing && !existing.verified) {
+        const timeSinceSent = Date.now() - new Date(existing.createdAt!).getTime();
+        if (timeSinceSent < 60000) {
+          return res.status(429).json({ message: "Please wait before requesting a new code", retryAfter: Math.ceil((60000 - timeSinceSent) / 1000) });
+        }
+      }
+
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      const otpHash = await bcrypt.hash(otp, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      await storage.createOtp({ userId, type, target, otpHash, expiresAt });
+
+      if (type === "phone") {
+        try {
+          const { sendWhatsAppOtp } = await import("./services/twilio");
+          const sent = await sendWhatsAppOtp(target, otp);
+          if (!sent) {
+            console.log(`[OTP-WhatsApp] Twilio failed, code for ${target}: ${otp}`);
+          }
+        } catch (err: any) {
+          console.log(`[OTP-WhatsApp] Twilio not available, code for ${target}: ${otp} — ${err.message}`);
+        }
+      } else {
+        console.log(`[OTP-Email] Code for ${target}: ${otp} (SendGrid integration pending)`);
+      }
+
+      res.json({ message: "Verification code sent", expiresIn: 600 });
+    } catch (error: any) {
+      console.error("OTP send error:", error);
+      res.status(500).json({ message: "Failed to send verification code" });
+    }
+  });
+
+  app.post("/api/otp/verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { type, target, code } = req.body;
+
+      if (!type || !target || !code) {
+        return res.status(400).json({ message: "Type, target, and code are required" });
+      }
+
+      const otp = await storage.getLatestOtp(userId, type, target);
+      if (!otp) {
+        return res.status(400).json({ message: "No verification code found. Please request a new one." });
+      }
+
+      if (otp.verified) {
+        return res.status(400).json({ message: "This code has already been used" });
+      }
+
+      if (new Date() > new Date(otp.expiresAt)) {
+        return res.status(400).json({ message: "Verification code has expired. Please request a new one." });
+      }
+
+      if ((otp.attempts || 0) >= 5) {
+        return res.status(400).json({ message: "Too many attempts. Please request a new code." });
+      }
+
+      await storage.incrementOtpAttempts(otp.id);
+
+      const valid = await bcrypt.compare(code, otp.otpHash);
+      if (!valid) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+
+      await storage.markOtpVerified(otp.id);
+
+      if (type === "phone") {
+        await storage.updateUser(userId, { phoneVerified: true });
+      } else if (type === "email") {
+        await storage.updateUser(userId, { emailVerified: true });
+      }
+
+      const updatedUser = await storage.getUser(userId);
+      res.json({ message: "Verified successfully", user: { ...updatedUser, password: undefined } });
+    } catch (error: any) {
+      console.error("OTP verify error:", error);
+      res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  app.get("/api/otp/status", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ phoneVerified: user.phoneVerified, emailVerified: user.emailVerified });
+  });
+
+  // ===== IC Upload via Object Storage =====
+  app.post("/api/ic/upload-url", isAuthenticated, async (req: any, res) => {
+    try {
+      const { side, contentType } = req.body;
+      if (!side || !["front", "back"].includes(side)) {
+        return res.status(400).json({ message: "Side must be 'front' or 'back'" });
+      }
+
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+      res.json({ uploadURL, objectPath, side });
+    } catch (error: any) {
+      console.error("IC upload URL error:", error);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  app.post("/api/ic/save-urls", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { icFrontUrl, icBackUrl } = req.body;
+
+      const updateData: any = {};
+      if (icFrontUrl) updateData.icFrontUrl = icFrontUrl;
+      if (icBackUrl) updateData.icBackUrl = icBackUrl;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "At least one URL is required" });
+      }
+
+      const user = await storage.updateUser(userId, updateData);
+      res.json({ ...user, password: undefined });
+    } catch (error: any) {
+      console.error("IC save URLs error:", error);
+      res.status(500).json({ message: "Failed to save IC URLs" });
+    }
+  });
+
+  // ===== ADMIN: Get user IC details (decrypted) =====
+  app.get("/api/admin/users/:id/ic", isAuthenticated, async (req: any, res) => {
+    const adminId = req.user.claims.sub;
+    const admin = await storage.getUser(adminId);
+    if (!admin || !isAdminOrAbove(admin.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const user = await storage.getUser(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let decryptedIc = user.icNumber || "";
+    if (decryptedIc && isEncrypted(decryptedIc)) {
+      decryptedIc = decryptText(decryptedIc);
+    }
+
+    res.json({
+      icNumber: decryptedIc,
+      maskedIc: maskIcNumber(decryptedIc),
+      icFrontPhoto: user.icFrontPhoto,
+      icBackPhoto: user.icBackPhoto,
+      icFrontUrl: user.icFrontUrl,
+      icBackUrl: user.icBackUrl,
+      verificationStatus: user.verificationStatus,
+      verificationNotes: user.verificationNotes,
+    });
+  });
+
   // ===== ADMIN: Verify user IC =====
   app.post("/api/admin/users/:id/verify", isAuthenticated, async (req: any, res) => {
     const adminId = req.user.claims.sub;
@@ -182,11 +370,11 @@ export async function registerRoutes(
     if (!admin || !isAdminOrAbove(admin.role)) {
       return res.status(403).json({ message: "Forbidden" });
     }
-    const { status } = req.body;
+    const { status, notes } = req.body;
     if (!["verified", "rejected"].includes(status)) {
       return res.status(400).json({ message: "Status must be 'verified' or 'rejected'" });
     }
-    const user = await storage.updateUserVerification(req.params.id, status);
+    const user = await storage.updateUserVerification(req.params.id, status, notes);
     res.json(user);
   });
 
@@ -509,6 +697,8 @@ export async function registerRoutes(
     const updated = await storage.updateMarketPrice(Number(req.params.id), String(pricePerKg));
     res.json(updated);
   });
+
+  registerObjectStorageRoutes(app);
 
   await seedData();
   return httpServer;

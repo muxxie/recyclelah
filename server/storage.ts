@@ -1,6 +1,6 @@
-import { users, requests, facilities, marketPrices, walletTransactions, type User, type UpsertUser, type Request, type InsertRequest, type Facility, type InsertFacility, type MarketPrice, type InsertMarketPrice, type WalletTransaction, type InsertWalletTransaction } from "@shared/schema";
+import { users, requests, facilities, marketPrices, walletTransactions, otpVerifications, type User, type UpsertUser, type Request, type InsertRequest, type Facility, type InsertFacility, type MarketPrice, type InsertMarketPrice, type WalletTransaction, type InsertWalletTransaction, type OtpVerification } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, and, or, ne } from "drizzle-orm";
+import { eq, desc, sql, and, or, ne, lt } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -8,15 +8,22 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   getUserByIcNumber(icNumber: string): Promise<User | undefined>;
+  getUserByIcHash(icHash: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserVerification(id: string, status: string): Promise<User>;
+  updateUser(id: string, data: Partial<UpsertUser>): Promise<User>;
+  updateUserVerification(id: string, status: string, notes?: string): Promise<User>;
   updateUserStatus(id: string, isOnline: boolean): Promise<User>;
   updateUserLocation(id: string, lat: string, lng: string): Promise<void>;
   updateUserRole(id: string, role: string): Promise<User>;
   updateUserBan(id: string, banned: boolean, banReason?: string): Promise<User>;
   getAllUsers(): Promise<User[]>;
+
+  createOtp(data: { userId: string; type: string; target: string; otpHash: string; expiresAt: Date }): Promise<OtpVerification>;
+  getLatestOtp(userId: string, type: string, target: string): Promise<OtpVerification | undefined>;
+  markOtpVerified(id: number): Promise<void>;
+  incrementOtpAttempts(id: number): Promise<void>;
 
   createRequest(request: any): Promise<Request>;
   getRequest(id: number): Promise<Request | undefined>;
@@ -64,6 +71,10 @@ export class DatabaseStorage implements IStorage {
     return (await db.select().from(users).where(eq(users.icNumber, icNumber)))[0];
   }
 
+  async getUserByIcHash(icHash: string) {
+    return (await db.select().from(users).where(eq(users.icHash, icHash)))[0];
+  }
+
   async getUserByGoogleId(googleId: string) {
     return (await db.select().from(users).where(eq(users.googleId, googleId)))[0];
   }
@@ -72,8 +83,12 @@ export class DatabaseStorage implements IStorage {
     return (await db.insert(users).values(userData).returning())[0];
   }
 
-  async updateUserVerification(id: string, status: string) {
-    return (await db.update(users).set({ verificationStatus: status, updatedAt: new Date() }).where(eq(users.id, id)).returning())[0];
+  async updateUser(id: string, data: Partial<UpsertUser>) {
+    return (await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, id)).returning())[0];
+  }
+
+  async updateUserVerification(id: string, status: string, notes?: string) {
+    return (await db.update(users).set({ verificationStatus: status, verificationNotes: notes || null, updatedAt: new Date() }).where(eq(users.id, id)).returning())[0];
   }
 
   async upsertUser(userData: UpsertUser) {
@@ -188,6 +203,32 @@ export class DatabaseStorage implements IStorage {
     const totalCommission = reqs.reduce((s, r) => s + Number(r.commissionAmount || 0), 0);
     const totalCollectorEarnings = totalPayout - totalCommission;
     return { totalJobs, totalWeight, totalPayout, totalCommission, totalCollectorEarnings };
+  }
+
+  async createOtp(data: { userId: string; type: string; target: string; otpHash: string; expiresAt: Date }) {
+    return (await db.insert(otpVerifications).values(data).returning())[0];
+  }
+
+  async getLatestOtp(userId: string, type: string, target: string) {
+    const results = await db.select().from(otpVerifications)
+      .where(and(
+        eq(otpVerifications.userId, userId),
+        eq(otpVerifications.type, type),
+        eq(otpVerifications.target, target),
+      ))
+      .orderBy(desc(otpVerifications.createdAt))
+      .limit(1);
+    return results[0];
+  }
+
+  async markOtpVerified(id: number) {
+    await db.update(otpVerifications).set({ verified: true }).where(eq(otpVerifications.id, id));
+  }
+
+  async incrementOtpAttempts(id: number) {
+    await db.update(otpVerifications).set({
+      attempts: sql`${otpVerifications.attempts} + 1`
+    }).where(eq(otpVerifications.id, id));
   }
 
   async seedFacilities(data: any[]) {

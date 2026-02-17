@@ -13,6 +13,7 @@ import MarketPage from "@/pages/market-page";
 import FacilitiesPage from "@/pages/facilities-page";
 import TrackingPage from "@/pages/tracking-page";
 import AdminDashboard from "@/pages/admin-dashboard";
+import VerifyPage from "@/pages/verify-page";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -48,6 +49,9 @@ function Router() {
         </Route>
         <Route path="/facilities">
           {!user ? <Redirect to="/" /> : <FacilitiesPage />}
+        </Route>
+        <Route path="/verify">
+          {!user ? <Redirect to="/" /> : <VerifyPage />}
         </Route>
         <Route component={NotFound} />
       </Switch>

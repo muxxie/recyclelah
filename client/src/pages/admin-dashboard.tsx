@@ -57,6 +57,8 @@ function UsersTab() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [icDetails, setIcDetails] = useState<any>(null);
+  const [verifyNotes, setVerifyNotes] = useState("");
   const [banDialogUser, setBanDialogUser] = useState<User | null>(null);
   const [banReason, setBanReason] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -92,13 +94,14 @@ function UsersTab() {
   });
 
   const verifyUser = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await apiRequest("POST", `/api/admin/users/${id}/verify`, { status });
+    mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/verify`, { status, notes });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setViewingUser(null);
+      setIcDetails(null);
       toast({ title: "Verification Updated" });
     },
   });
@@ -223,8 +226,15 @@ function UsersTab() {
                   <Badge variant="outline" className="text-xs capitalize">{u.role}</Badge>
                 )}
                 <p className="text-xs font-medium">RM {Number(u.balance || 0).toFixed(2)}</p>
-                {(u.icFrontPhoto || u.icBackPhoto) && (
-                  <Button size="icon" variant="outline" onClick={() => setViewingUser(u)} data-testid={`button-view-ic-${u.id}`}>
+                {(u.icFrontPhoto || u.icBackPhoto || u.icFrontUrl || u.icBackUrl || u.verificationStatus === "pending") && (
+                  <Button size="icon" variant="outline" onClick={async () => {
+                    setViewingUser(u);
+                    setVerifyNotes("");
+                    try {
+                      const res = await fetch(`/api/admin/users/${u.id}/ic`);
+                      if (res.ok) setIcDetails(await res.json());
+                    } catch {}
+                  }} data-testid={`button-view-ic-${u.id}`}>
                     <Eye className="w-4 h-4" />
                   </Button>
                 )}
@@ -260,8 +270,8 @@ function UsersTab() {
         ))}
       </div>
 
-      <Dialog open={!!viewingUser} onOpenChange={() => setViewingUser(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={!!viewingUser} onOpenChange={() => { setViewingUser(null); setIcDetails(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>IC Verification - {viewingUser?.firstName} {viewingUser?.lastName}</DialogTitle>
             <DialogDescription>Review the user's Malaysian IC photos for identity verification</DialogDescription>
@@ -282,47 +292,89 @@ function UsersTab() {
                   <p className="font-medium">{viewingUser.phone || "N/A"}</p>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-md">
-                  <p className="text-xs text-muted-foreground">IC Number</p>
-                  <p className="font-medium" data-testid="text-ic-number">{viewingUser.icNumber || "N/A"}</p>
+                  <p className="text-xs text-muted-foreground">IC Number (Decrypted)</p>
+                  <p className="font-medium font-mono" data-testid="text-ic-number">
+                    {icDetails?.icNumber || icDetails?.maskedIc || "Loading..."}
+                  </p>
                 </div>
-                <div className="p-2 bg-muted/50 rounded-md col-span-2">
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Gender</p>
+                  <p className="font-medium capitalize">{viewingUser.gender || "N/A"}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Phone Verified</p>
+                  <p className="font-medium">{viewingUser.phoneVerified ? "Yes" : "No"}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <p className="text-xs text-muted-foreground">Email Verified</p>
+                  <p className="font-medium">{viewingUser.emailVerified ? "Yes" : "No"}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
                   <p className="text-xs text-muted-foreground">Status</p>
                   <VerificationBadge status={viewingUser.verificationStatus} />
                 </div>
               </div>
 
-              {viewingUser.icFrontPhoto && (
-                <div>
-                  <p className="text-sm font-medium mb-1">IC Front (MyKad)</p>
-                  <img src={viewingUser.icFrontPhoto} alt="IC Front" className="w-full rounded-md border" data-testid="img-ic-front" />
+              {icDetails?.verificationNotes && (
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md">
+                  <p className="text-xs text-muted-foreground mb-1">Previous Admin Notes</p>
+                  <p className="text-sm">{icDetails.verificationNotes}</p>
                 </div>
               )}
-              {viewingUser.icBackPhoto && (
+
+              {(icDetails?.icFrontUrl || viewingUser.icFrontPhoto) && (
+                <div>
+                  <p className="text-sm font-medium mb-1">IC Front (MyKad)</p>
+                  <img
+                    src={icDetails?.icFrontUrl || viewingUser.icFrontPhoto}
+                    alt="IC Front"
+                    className="w-full rounded-md border"
+                    data-testid="img-ic-front"
+                  />
+                </div>
+              )}
+              {(icDetails?.icBackUrl || viewingUser.icBackPhoto) && (
                 <div>
                   <p className="text-sm font-medium mb-1">IC Back (MyKad)</p>
-                  <img src={viewingUser.icBackPhoto} alt="IC Back" className="w-full rounded-md border" data-testid="img-ic-back" />
+                  <img
+                    src={icDetails?.icBackUrl || viewingUser.icBackPhoto}
+                    alt="IC Back"
+                    className="w-full rounded-md border"
+                    data-testid="img-ic-back"
+                  />
                 </div>
               )}
 
               {viewingUser.verificationStatus !== "verified" && (
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 text-red-600 border-red-200 dark:border-red-800"
-                    onClick={() => verifyUser.mutate({ id: viewingUser.id, status: "rejected" })}
-                    disabled={verifyUser.isPending}
-                    data-testid="button-reject-ic"
-                  >
-                    <ShieldX className="w-4 h-4 mr-2" /> Reject
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={() => verifyUser.mutate({ id: viewingUser.id, status: "verified" })}
-                    disabled={verifyUser.isPending}
-                    data-testid="button-approve-ic"
-                  >
-                    <ShieldCheck className="w-4 h-4 mr-2" /> Approve
-                  </Button>
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <p className="text-sm font-medium mb-1">Verification Notes</p>
+                    <Textarea
+                      placeholder="Add notes about this verification (optional)..."
+                      value={verifyNotes}
+                      onChange={(e) => setVerifyNotes(e.target.value)}
+                      data-testid="input-verify-notes"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-red-600 border-red-200 dark:border-red-800"
+                      onClick={() => verifyUser.mutate({ id: viewingUser.id, status: "rejected", notes: verifyNotes } as any)}
+                      disabled={verifyUser.isPending}
+                      data-testid="button-reject-ic"
+                    >
+                      <ShieldX className="w-4 h-4 mr-2" /> Reject
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={() => verifyUser.mutate({ id: viewingUser.id, status: "verified", notes: verifyNotes } as any)}
+                      disabled={verifyUser.isPending}
+                      data-testid="button-approve-ic"
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" /> Approve
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

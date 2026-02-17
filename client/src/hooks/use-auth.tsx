@@ -67,7 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      toast({ title: "Account Created", description: "Your IC is pending verification." });
+      toast({ title: "Account Created", description: "Please verify your phone and email." });
+      setLocation("/verify");
     },
     onError: (error: Error) => {
       toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
