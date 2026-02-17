@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { registerSchema } from "@shared/schema";
+import { registerSchema, parseIcBirthDate, getAgeFromBirthDate } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
+  const [icInfo, setIcInfo] = useState<{ birthDate: Date; age: number } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -339,9 +340,33 @@ export default function AuthPage() {
                                     placeholder="e.g. 901231-14-5678"
                                     maxLength={14}
                                     {...field}
+                                    onChange={(e) => {
+                                      let raw = e.target.value.replace(/[^0-9]/g, "");
+                                      if (raw.length > 12) raw = raw.substring(0, 12);
+                                      let formatted = raw;
+                                      if (raw.length > 6) formatted = raw.substring(0, 6) + "-" + raw.substring(6);
+                                      if (raw.length > 8) formatted = raw.substring(0, 6) + "-" + raw.substring(6, 8) + "-" + raw.substring(8);
+                                      field.onChange(formatted);
+                                      const bd = parseIcBirthDate(formatted);
+                                      if (bd) {
+                                        setIcInfo({ birthDate: bd, age: getAgeFromBirthDate(bd) });
+                                      } else {
+                                        setIcInfo(null);
+                                      }
+                                    }}
                                     data-testid="input-ic-number"
                                   />
                                 </FormControl>
+                                {icInfo && (
+                                  <div className={`text-xs mt-1 flex items-center gap-2 ${icInfo.age >= 18 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                    <span data-testid="text-ic-birthdate">
+                                      Born: {icInfo.birthDate.toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
+                                    </span>
+                                    <span data-testid="text-ic-age">
+                                      ({icInfo.age} years old{icInfo.age < 18 ? " - must be 18+" : ""})
+                                    </span>
+                                  </div>
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}

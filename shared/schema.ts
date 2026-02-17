@@ -89,6 +89,31 @@ export const insertFacilitySchema = createInsertSchema(facilities).omit({ id: tr
 export const insertMarketPriceSchema = createInsertSchema(marketPrices).omit({ id: true, updatedAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, balance: true, isOnline: true, verificationStatus: true });
 
+export function parseIcBirthDate(icNumber: string): Date | null {
+  const cleaned = icNumber.replace(/[-\s]/g, "");
+  if (cleaned.length < 6) return null;
+  const yy = parseInt(cleaned.substring(0, 2), 10);
+  const mm = parseInt(cleaned.substring(2, 4), 10);
+  const dd = parseInt(cleaned.substring(4, 6), 10);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  const currentYear = new Date().getFullYear() % 100;
+  const century = yy <= currentYear ? 2000 : 1900;
+  const fullYear = century + yy;
+  const date = new Date(fullYear, mm - 1, dd);
+  if (date.getFullYear() !== fullYear || date.getMonth() !== mm - 1 || date.getDate() !== dd) return null;
+  return date;
+}
+
+export function getAgeFromBirthDate(birthDate: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 export const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -97,7 +122,20 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["seller", "collector"]),
   vehicleType: z.string().optional(),
-  icNumber: z.string().min(12, "IC number must be 12 digits").max(14, "IC number too long"),
+  icNumber: z.string()
+    .refine((val) => {
+      const cleaned = val.replace(/[-\s]/g, "");
+      return cleaned.length === 12 && /^\d{12}$/.test(cleaned);
+    }, "IC number must be 12 digits in format YYMMDD-XX-XXXX")
+    .refine((val) => {
+      const birthDate = parseIcBirthDate(val);
+      return birthDate !== null;
+    }, "Invalid birth date in IC number")
+    .refine((val) => {
+      const birthDate = parseIcBirthDate(val);
+      if (!birthDate) return false;
+      return getAgeFromBirthDate(birthDate) >= 18;
+    }, "You must be at least 18 years old to register"),
   icFrontPhoto: z.string().min(1, "IC front photo is required"),
   icBackPhoto: z.string().min(1, "IC back photo is required"),
 });
