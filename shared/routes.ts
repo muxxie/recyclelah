@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { insertUserSchema, insertRequestSchema, insertFacilitySchema, insertMarketPriceSchema, users, requests, facilities, marketPrices } from './schema';
+import { insertUserSchema, insertRequestSchema, insertFacilitySchema, insertMarketPriceSchema, registerSchema, users, requests, facilities, marketPrices } from './schema';
 
 // ============================================
 // API CONTRACT
@@ -12,7 +12,7 @@ export const api = {
     register: {
       method: 'POST' as const,
       path: '/api/register' as const,
-      input: insertUserSchema,
+      input: registerSchema,
       responses: {
         201: z.custom<typeof users.$inferSelect>(),
         400: z.object({ message: z.string() }),
@@ -20,8 +20,8 @@ export const api = {
     },
     login: {
       method: 'POST' as const,
-      path: '/api/login' as const,
-      input: z.object({ username: z.string(), password: z.string() }),
+      path: '/api/auth/login' as const,
+      input: z.object({ email: z.string(), password: z.string() }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         401: z.object({ message: z.string() }),

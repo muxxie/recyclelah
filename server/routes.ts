@@ -2,8 +2,10 @@ import type { Express } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertRequestSchema } from "@shared/schema";
+import { insertRequestSchema, registerSchema } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const locationSubscribers = new Map<number, Set<WebSocket>>();
 
@@ -58,6 +60,84 @@ export async function registerRoutes(
         if (subscribers.size === 0) locationSubscribers.delete(requestId);
       }
     });
+  });
+
+  // ===== REGISTRATION & LOGIN =====
+  app.post("/api/register", async (req, res) => {
+    try {
+      const data = registerSchema.parse(req.body);
+      const existing = await storage.getUserByEmail(data.email);
+      if (existing) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const userId = crypto.randomUUID();
+      const user = await storage.createUser({
+        id: userId,
+        email: data.email,
+        username: data.email,
+        password: hashedPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
+        phone: data.phone,
+        vehicleType: data.vehicleType || null,
+        icFrontPhoto: data.icFrontPhoto,
+        icBackPhoto: data.icBackPhoto,
+        verificationStatus: "pending",
+      });
+      const safeUser = { ...user, password: undefined };
+      (req as any).login({ claims: { sub: userId, email: data.email, first_name: data.firstName, last_name: data.lastName } }, (err: any) => {
+        if (err) return res.status(500).json({ message: "Registration succeeded but auto-login failed" });
+        res.status(201).json(safeUser);
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: error.errors?.[0]?.message || "Invalid input" });
+      }
+      console.error("Registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      const safeUser = { ...user, password: undefined };
+      (req as any).login({ claims: { sub: user.id, email: user.email, first_name: user.firstName, last_name: user.lastName } }, (err: any) => {
+        if (err) return res.status(500).json({ message: "Login failed" });
+        res.json(safeUser);
+      });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // ===== ADMIN: Verify user IC =====
+  app.post("/api/admin/users/:id/verify", isAuthenticated, async (req: any, res) => {
+    const adminId = req.user.claims.sub;
+    const admin = await storage.getUser(adminId);
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { status } = req.body;
+    if (!["verified", "rejected"].includes(status)) {
+      return res.status(400).json({ message: "Status must be 'verified' or 'rejected'" });
+    }
+    const user = await storage.updateUserVerification(req.params.id, status);
+    res.json(user);
   });
 
   app.post("/api/users/status", isAuthenticated, async (req: any, res) => {

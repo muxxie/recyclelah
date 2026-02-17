@@ -5,7 +5,10 @@ import { eq, desc, sql, and } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserVerification(id: string, status: string): Promise<User>;
   updateUserStatus(id: string, isOnline: boolean): Promise<User>;
   updateUserLocation(id: string, lat: string, lng: string): Promise<void>;
   updateUserRole(id: string, role: string): Promise<User>;
@@ -43,6 +46,18 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string) {
     return (await db.select().from(users).where(eq(users.username, username)))[0];
+  }
+
+  async getUserByEmail(email: string) {
+    return (await db.select().from(users).where(eq(users.email, email)))[0];
+  }
+
+  async createUser(userData: UpsertUser) {
+    return (await db.insert(users).values(userData).returning())[0];
+  }
+
+  async updateUserVerification(id: string, status: string) {
+    return (await db.update(users).set({ verificationStatus: status, updatedAt: new Date() }).where(eq(users.id, id)).returning())[0];
   }
 
   async upsertUser(userData: UpsertUser) {
