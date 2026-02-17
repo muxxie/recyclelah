@@ -9,13 +9,17 @@ import crypto from "crypto";
 
 const locationSubscribers = new Map<number, Set<WebSocket>>();
 
-function getAdminEmails(): string[] {
+function getSuperAdminEmails(): string[] {
   const raw = process.env.ADMIN_EMAILS || "";
   return raw.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
 }
 
-function isAdminEmail(email: string): boolean {
-  return getAdminEmails().includes(email.toLowerCase());
+function isSuperAdminEmail(email: string): boolean {
+  return getSuperAdminEmails().includes(email.toLowerCase());
+}
+
+function isAdminOrAbove(role: string): boolean {
+  return role === "admin" || role === "super_admin";
 }
 
 export async function registerRoutes(
@@ -95,7 +99,7 @@ export async function registerRoutes(
       const hashedPassword = await bcrypt.hash(data.password, 10);
       const userId = crypto.randomUUID();
 
-      const assignedRole = isAdminEmail(data.email) ? "admin" : data.role;
+      const assignedRole = isSuperAdminEmail(data.email) ? "super_admin" : data.role;
 
       const user = await storage.createUser({
         id: userId,
@@ -146,9 +150,9 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      if (isAdminEmail(email) && user.role !== "admin") {
-        await storage.updateUserRole(user.id, "admin");
-        user.role = "admin";
+      if (isSuperAdminEmail(email) && user.role !== "super_admin") {
+        await storage.updateUserRole(user.id, "super_admin");
+        user.role = "super_admin";
       }
 
       const safeUser = { ...user, password: undefined };
@@ -166,7 +170,7 @@ export async function registerRoutes(
   app.post("/api/admin/users/:id/verify", isAuthenticated, async (req: any, res) => {
     const adminId = req.user.claims.sub;
     const admin = await storage.getUser(adminId);
-    if (!admin || admin.role !== "admin") {
+    if (!admin || !isAdminOrAbove(admin.role)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const { status } = req.body;
@@ -181,15 +185,18 @@ export async function registerRoutes(
   app.post("/api/admin/users/:id/ban", isAuthenticated, async (req: any, res) => {
     const adminId = req.user.claims.sub;
     const admin = await storage.getUser(adminId);
-    if (!admin || admin.role !== "admin") {
+    if (!admin || !isAdminOrAbove(admin.role)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const targetUser = await storage.getUser(req.params.id);
     if (!targetUser) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (targetUser.role === "admin") {
-      return res.status(400).json({ message: "Cannot ban an admin user" });
+    if (targetUser.role === "super_admin") {
+      return res.status(400).json({ message: "Cannot ban a super admin" });
+    }
+    if (targetUser.role === "admin" && admin.role !== "super_admin") {
+      return res.status(400).json({ message: "Only super admin can ban admins" });
     }
     const { reason } = req.body;
     const updated = await storage.updateUserBan(req.params.id, true, reason || "Banned by admin");
@@ -199,10 +206,52 @@ export async function registerRoutes(
   app.post("/api/admin/users/:id/unban", isAuthenticated, async (req: any, res) => {
     const adminId = req.user.claims.sub;
     const admin = await storage.getUser(adminId);
-    if (!admin || admin.role !== "admin") {
+    if (!admin || !isAdminOrAbove(admin.role)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const updated = await storage.updateUserBan(req.params.id, false);
+    res.json(updated);
+  });
+
+  // ===== SUPER ADMIN: Promote/Demote admin =====
+  app.post("/api/admin/users/:id/promote", isAuthenticated, async (req: any, res) => {
+    const adminId = req.user.claims.sub;
+    const admin = await storage.getUser(adminId);
+    if (!admin || admin.role !== "super_admin") {
+      return res.status(403).json({ message: "Only super admin can promote users to admin" });
+    }
+    const targetUser = await storage.getUser(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (targetUser.role === "super_admin") {
+      return res.status(400).json({ message: "Cannot modify super admin role" });
+    }
+    const updated = await storage.updateUserRole(req.params.id, "admin");
+    res.json(updated);
+  });
+
+  app.post("/api/admin/users/:id/demote", isAuthenticated, async (req: any, res) => {
+    const adminId = req.user.claims.sub;
+    const admin = await storage.getUser(adminId);
+    if (!admin || admin.role !== "super_admin") {
+      return res.status(403).json({ message: "Only super admin can demote admins" });
+    }
+    const targetUser = await storage.getUser(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (targetUser.role === "super_admin") {
+      return res.status(400).json({ message: "Cannot demote a super admin" });
+    }
+    if (targetUser.role !== "admin") {
+      return res.status(400).json({ message: "User is not an admin" });
+    }
+    const demoteTo = req.body.role || "seller";
+    if (!["seller", "collector"].includes(demoteTo)) {
+      return res.status(400).json({ message: "Can only demote to seller or collector" });
+    }
+    const updated = await storage.updateUserRole(req.params.id, demoteTo);
     res.json(updated);
   });
 
@@ -406,37 +455,38 @@ export async function registerRoutes(
   app.get("/api/admin/stats", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
-    if (!user || user.role !== "admin") return res.status(403).send();
+    if (!user || !isAdminOrAbove(user.role)) return res.status(403).send();
     res.json(await storage.getStats());
   });
 
   app.get("/api/admin/users", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
-    if (!user || user.role !== "admin") return res.status(403).send();
+    if (!user || !isAdminOrAbove(user.role)) return res.status(403).send();
     res.json(await storage.getAllUsers());
   });
 
   app.get("/api/admin/requests", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
-    if (!user || user.role !== "admin") return res.status(403).send();
+    if (!user || !isAdminOrAbove(user.role)) return res.status(403).send();
     res.json(await storage.getAllRequests());
   });
 
   app.get("/api/admin/transactions", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
-    if (!user || user.role !== "admin") return res.status(403).send();
+    if (!user || !isAdminOrAbove(user.role)) return res.status(403).send();
     res.json(await storage.getAllWalletTransactions());
   });
 
   app.patch("/api/admin/users/:id/role", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
-    if (!user || user.role !== "admin") return res.status(403).send();
+    if (!user || user.role !== "super_admin") return res.status(403).json({ message: "Only super admin can change roles" });
     const { role } = req.body;
-    if (!["seller", "collector", "admin"].includes(role)) return res.status(400).json({ message: "Invalid role" });
+    if (!["seller", "collector", "admin", "super_admin"].includes(role)) return res.status(400).json({ message: "Invalid role" });
+    if (role === "super_admin") return res.status(400).json({ message: "Cannot assign super_admin role through this endpoint" });
     const updated = await storage.updateUserRole(req.params.id, role);
     res.json(updated);
   });
@@ -444,7 +494,7 @@ export async function registerRoutes(
   app.patch("/api/admin/prices/:id", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
-    if (!user || user.role !== "admin") return res.status(403).send();
+    if (!user || !isAdminOrAbove(user.role)) return res.status(403).send();
     const { pricePerKg } = req.body;
     if (!pricePerKg || Number(pricePerKg) < 0) return res.status(400).json({ message: "Invalid price" });
     const updated = await storage.updateMarketPrice(Number(req.params.id), String(pricePerKg));

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Users, Package, DollarSign, TrendingUp, Scale, ShieldCheck, ShieldX, ShieldAlert, Eye, Ban, Search } from "lucide-react";
+import { Loader2, Users, Package, DollarSign, TrendingUp, Scale, ShieldCheck, ShieldX, ShieldAlert, Eye, Ban, Search, Crown, UserPlus, UserMinus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -51,6 +51,8 @@ function VerificationBadge({ status }: { status: string }) {
 }
 
 function UsersTab() {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === "super_admin";
   const { data: users, isLoading } = useQuery<User[]>({ queryKey: ["/api/admin/users"] });
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -61,14 +63,31 @@ function UsersTab() {
   const [filterRole, setFilterRole] = useState("all");
   const [filterVerification, setFilterVerification] = useState("all");
 
-  const updateRole = useMutation({
-    mutationFn: async ({ id, role }: { id: string; role: string }) => {
-      const res = await apiRequest("PATCH", `/api/admin/users/${id}/role`, { role });
+  const promoteUser = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/promote`, {});
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Role Updated" });
+      toast({ title: "User promoted to Admin" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const demoteUser = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/demote`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Admin demoted to regular user" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -149,6 +168,7 @@ function UsersTab() {
               <SelectItem value="seller">Seller</SelectItem>
               <SelectItem value="collector">Collector</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="super_admin">Super Admin</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterVerification} onValueChange={setFilterVerification}>
@@ -191,14 +211,24 @@ function UsersTab() {
               </div>
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <VerificationBadge status={u.verificationStatus} />
-                <Badge variant="outline" className="text-xs capitalize">{u.role}</Badge>
+                {u.role === "super_admin" ? (
+                  <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800">
+                    <Crown className="w-3 h-3 mr-1" />Super Admin
+                  </Badge>
+                ) : u.role === "admin" ? (
+                  <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+                    <ShieldCheck className="w-3 h-3 mr-1" />Admin
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs capitalize">{u.role}</Badge>
+                )}
                 <p className="text-xs font-medium">RM {Number(u.balance || 0).toFixed(2)}</p>
                 {(u.icFrontPhoto || u.icBackPhoto) && (
                   <Button size="icon" variant="outline" onClick={() => setViewingUser(u)} data-testid={`button-view-ic-${u.id}`}>
                     <Eye className="w-4 h-4" />
                   </Button>
                 )}
-                {u.role !== "admin" && (
+                {u.role !== "super_admin" && (
                   <>
                     {u.banned ? (
                       <Button size="sm" variant="outline" onClick={() => unbanUser.mutate(u.id)} disabled={unbanUser.isPending} data-testid={`button-unban-${u.id}`}>
@@ -211,16 +241,19 @@ function UsersTab() {
                     )}
                   </>
                 )}
-                <Select defaultValue={u.role} onValueChange={(role) => updateRole.mutate({ id: u.id, role })}>
-                  <SelectTrigger className="w-28" data-testid={`select-role-${u.id}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="seller">Seller</SelectItem>
-                    <SelectItem value="collector">Collector</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+                {isSuperAdmin && u.role !== "super_admin" && (
+                  <>
+                    {u.role === "admin" ? (
+                      <Button size="sm" variant="outline" onClick={() => demoteUser.mutate(u.id)} disabled={demoteUser.isPending} data-testid={`button-demote-${u.id}`}>
+                        <UserMinus className="w-3 h-3 mr-1" /> Remove Admin
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 dark:border-blue-800" onClick={() => promoteUser.mutate(u.id)} disabled={promoteUser.isPending} data-testid={`button-promote-${u.id}`}>
+                        <UserPlus className="w-3 h-3 mr-1" /> Make Admin
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -482,13 +515,24 @@ function TransactionsTab() {
 }
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const { data: stats, isLoading } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
 
   if (isLoading) return <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-admin-title">Admin Dashboard</h1>
+      <div className="flex items-center gap-3 flex-wrap">
+        <h1 className="text-2xl md:text-3xl font-display font-bold" data-testid="text-admin-title">
+          {isSuperAdmin ? "Super Admin Dashboard" : "Admin Dashboard"}
+        </h1>
+        {isSuperAdmin && (
+          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800">
+            <Crown className="w-3 h-3 mr-1" />Super Admin
+          </Badge>
+        )}
+      </div>
 
       <StatsCards stats={stats || { totalJobs: 0, totalWeight: 0, totalPayout: 0, totalCommission: 0 }} />
 

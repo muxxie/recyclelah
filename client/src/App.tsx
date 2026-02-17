@@ -19,7 +19,8 @@ function Router() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
-  const homeRedirect = !user ? "/" : user.role === "admin" ? "/admin" : user.role === "collector" ? "/collector" : "/dashboard";
+  const isAdminRole = user?.role === "admin" || user?.role === "super_admin";
+  const homeRedirect = !user ? "/" : isAdminRole ? "/admin" : user.role === "collector" ? "/collector" : "/dashboard";
 
   return (
     <LayoutShell>
@@ -28,7 +29,7 @@ function Router() {
           {user ? <Redirect to={homeRedirect} /> : <AuthPage />}
         </Route>
         <Route path="/dashboard">
-          {!user ? <Redirect to="/" /> : user.role === "admin" ? <Redirect to="/admin" /> : <SellerDashboard />}
+          {!user ? <Redirect to="/" /> : isAdminRole ? <Redirect to="/admin" /> : <SellerDashboard />}
         </Route>
         <Route path="/collector">
           {!user ? <Redirect to="/" /> : user.role !== "collector" ? <Redirect to={homeRedirect} /> : <CollectorDashboard />}
@@ -40,7 +41,7 @@ function Router() {
           {!user ? <Redirect to="/" /> : <TrackingPage />}
         </Route>
         <Route path="/admin">
-          {!user ? <Redirect to="/" /> : user.role !== "admin" ? <Redirect to={homeRedirect} /> : <AdminDashboard />}
+          {!user ? <Redirect to="/" /> : !isAdminRole ? <Redirect to={homeRedirect} /> : <AdminDashboard />}
         </Route>
         <Route path="/market">
           {!user ? <Redirect to="/" /> : <MarketPage />}

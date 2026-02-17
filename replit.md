@@ -60,7 +60,11 @@ Preferred communication style: Simple, everyday language.
 - **Storage Interface**: `IStorage` interface in `server/storage.ts` abstracts all database operations, with `DatabaseStorage` as the PostgreSQL implementation. This makes it possible to swap storage backends.
 - **Upsert Pattern**: Users are upserted on authentication (create if new, update if existing) to handle OIDC login flows.
 - **Seed Data**: Facilities and market prices support seeding via `seedFacilities()` and `seedMarketPrices()` methods that only insert if tables are empty.
-- **Role-Based Views**: The frontend renders different dashboards based on user role (`seller` vs `collector`). Routing guards redirect unauthorized users.
+- **Role-Based Views**: The frontend renders different dashboards based on user role (`seller`, `collector`, `admin`, `super_admin`). Routing guards redirect unauthorized users.
+- **Three-Tier Role System**: Users can be `seller`, `collector`, `admin`, or `super_admin`. Super admins (configured via `ADMIN_EMAILS` env var) can promote/demote admins. Admins can verify users, ban/unban non-admin users. Super admins can ban anyone except other super admins.
+- **IC Verification**: Malaysian IC number (YYMMDD-XX-XXXX format) validated for birth date and 18+ age. IC front/back photos captured via camera or file upload. Admin/super admin can approve or reject IC verification.
+- **Ban System**: Admins can ban users with custom reasons. Banned users cannot log in and see the ban reason.
+- **Duplicate Prevention**: Email, phone, and IC number are checked for uniqueness during registration.
 
 ## External Dependencies
 
@@ -86,4 +90,5 @@ Preferred communication style: Simple, everyday language.
 - `SESSION_SECRET` — Secret for session encryption (required)
 - `REPL_ID` — Replit environment identifier (required for auth)
 - `ISSUER_URL` — OIDC issuer URL (optional, defaults to Replit's)
+- `ADMIN_EMAILS` — Comma-separated emails for super admin auto-assignment (e.g. `hafizbinabubakar@gmail.com`)
 - `PORT` — Server port (optional, defaults to 5000)

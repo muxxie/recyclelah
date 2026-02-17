@@ -24,7 +24,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
-  const isAdmin = user.role === "admin";
+  const isAdmin = user.role === "admin" || user.role === "super_admin";
   const isCollector = user.role === "collector";
 
   const links = isAdmin
@@ -130,7 +130,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
               <p className="font-medium text-xs truncate" data-testid="text-sidebar-username">
                 {user.firstName || user.username}
               </p>
-              <p className="text-[10px] text-muted-foreground capitalize">{user.role}</p>
+              <p className="text-[10px] text-muted-foreground capitalize">{user.role === "super_admin" ? "Super Admin" : user.role}</p>
             </div>
           </div>
           <Button

@@ -27,7 +27,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'admin') setLocation('/admin');
+      if (user.role === 'admin' || user.role === 'super_admin') setLocation('/admin');
       else if (user.role === 'collector') setLocation('/collector');
       else setLocation('/dashboard');
     }
