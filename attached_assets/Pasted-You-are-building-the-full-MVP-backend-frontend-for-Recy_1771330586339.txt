@@ -1,0 +1,199 @@
+You are building the full MVP backend + frontend for RecycleLah, a recycling pickup platform with three interfaces: SELLER, COLLECTOR, and ADMIN. The entire system must be mobile-first, responsive, and structured cleanly for future conversion into a mobile app (FlutterFlow or React Native wrapper).
+
+===========================
+SYSTEM OVERVIEW
+===========================
+RecycleLah connects SELLERS who want to recycle items with COLLECTORS who pick up and deliver items to recycling centers. The platform includes:
+- Real-time GPS tracking
+- Wallet + escrow logic
+- Dynamic recycling prices
+- Admin oversight
+- Mobile-friendly UI
+
+===========================
+USER ROLES
+===========================
+1. SELLER (household or business)
+2. COLLECTOR (gig worker)
+3. ADMIN (platform owner)
+
+===========================
+CORE FEATURES
+===========================
+
+1. AUTHENTICATION
+- Username + password login
+- Role selection: SELLER or COLLECTOR
+- Phone number required
+- JWT-based auth or Replit Auth
+- Store users in database with role field
+
+===========================
+SELLER INTERFACE (MOBILE-FIRST)
+===========================
+Pages required:
+- Dashboard (summary of wallet, active jobs, history)
+- Create Pickup Request:
+  - Item type
+  - Estimated weight
+  - Address
+  - GPS coordinates (auto-detect)
+- Track Collector:
+  - Map showing collector location in real-time
+  - ETA
+- Wallet:
+  - Balance
+  - Top-up (mock FPX API)
+  - Transaction history
+- Upload Receipt (after recycling center verifies)
+- Settings (profile, logout)
+
+UI requirements:
+- Clean, simple, mobile-first layout
+- Use responsive CSS (Flexbox/Grid)
+- Use Leaflet.js for maps
+- Buttons large enough for mobile
+- Minimal text, clear icons
+
+===========================
+COLLECTOR INTERFACE (MOBILE-FIRST)
+===========================
+Pages required:
+- Dashboard (earnings, active jobs)
+- Available Jobs:
+  - List of nearby seller requests
+  - Accept job (requires wallet credit)
+- Active Job:
+  - Navigate to seller
+  - Navigate to recycling center
+  - Upload receipt
+  - Update live location every X seconds
+- Wallet:
+  - Balance
+  - Commission earned
+  - Transaction history
+- Settings (profile, logout)
+
+UI requirements:
+- Mobile-first
+- Map view optimized for small screens
+- Large buttons for navigation
+- Real-time location updates
+
+===========================
+ADMIN DASHBOARD (DESKTOP + MOBILE)
+===========================
+Pages required:
+- Overview dashboard (stats, charts)
+- Users list (seller/collector)
+- Jobs list (active, completed, cancelled)
+- Wallet balances
+- Escrow ledger
+- Approve withdrawals
+- Adjust recycling prices
+- View receipts
+
+UI requirements:
+- Desktop-first but responsive
+- Table views
+- Filters + search
+- Simple admin theme
+
+===========================
+ESCROW + WALLET LOGIC
+===========================
+- Seller must have enough balance to create job
+- When collector accepts job:
+  - Lock seller’s amount into ESCROW (internal ledger)
+- After receipt verification:
+  - Release ESCROW:
+    - Collector payout
+    - Platform commission
+    - Seller receives remaining amount (if applicable)
+- Wallet top-up uses mock FPX API (ToyyibPay/Billplz placeholder)
+- Withdrawal is manual (admin triggers)
+
+===========================
+REAL-TIME TRACKING
+===========================
+- Collector sends GPS coordinates every few seconds
+- Seller sees collector moving on map
+- Use WebSockets or polling
+- Map shows:
+  - Seller location
+  - Collector location
+  - Recycling center location
+
+===========================
+RECYCLING CENTER MODULE
+===========================
+- Hardcode 3–5 centers
+- Each center has:
+  - Name
+  - Address
+  - GPS coordinates
+
+===========================
+PRICE API (MOCK)
+===========================
+Create endpoint /prices returning:
+- Paper price
+- Plastic price
+- Metal price
+- E-waste price
+
+===========================
+TECH STACK
+===========================
+- Node.js + Express backend
+- Replit Database or SQLite
+- HTML/CSS/JS frontend
+- Leaflet.js for maps
+- WebSockets for tracking
+- REST API for mobile app integration later
+
+===========================
+ARCHITECTURE REQUIREMENTS
+===========================
+Folder structure:
+  /routes
+  /controllers
+  /models
+  /middleware
+  /utils
+  /public
+  /views
+
+Other requirements:
+- Use environment variables
+- Modular controllers
+- Async/await
+- Error handling
+- Mobile-first responsive CSS
+
+===========================
+DELIVERABLES
+===========================
+1. Full backend API
+2. Seller interface (mobile-first)
+3. Collector interface (mobile-first)
+4. Admin dashboard (responsive)
+5. Wallet + escrow system
+6. Real-time tracking system
+7. Mock payment integration
+8. Price API
+9. Clean UI components
+10. Ready for mobile app conversion
+
+===========================
+BEGIN BUILDING NOW
+===========================
+Start by generating:
+1. Folder structure
+2. Database schema
+3. Auth system
+4. Wallet + escrow logic
+5. Seller UI
+6. Collector UI
+7. Admin dashboard
+8. Real-time tracking
