@@ -27,6 +27,9 @@ export const users = pgTable("users", {
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   balance: decimal("balance", { precision: 10, scale: 2 }).default("0"),
+  icFrontPhoto: text("ic_front_photo"),
+  icBackPhoto: text("ic_back_photo"),
+  verificationStatus: varchar("verification_status", { length: 20 }).default("unverified").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
