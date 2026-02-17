@@ -55,37 +55,22 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Panel - Hero */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-primary text-primary-foreground relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-emerald-800 to-black/20" />
-        <div className="absolute -right-20 -top-20 w-96 h-96 bg-accent/20 rounded-full blur-3xl" />
-        <div className="absolute -left-20 bottom-20 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
-        
-        {/* Scenic Forest Landscape from Unsplash */}
-        <div className="absolute inset-0 opacity-20 mix-blend-overlay">
-          {/* forest nature background */}
-          <img 
-            src="https://pixabay.com/get/gd19d392d13454ba79dc55cd1d8b3beab3fd7f34b18289024173ff0f501df8081cb7a4965639c8382b7bfcf46d49023f368237b3970e8425f4593bf13df152aa8_1280.jpg" 
-            alt="Nature Background"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 text-2xl font-display font-bold mb-4">
-            <Leaf className="w-8 h-8 fill-accent text-accent" />
+      <div className="hidden lg:flex flex-col justify-center p-12 bg-[#449e63] text-white relative overflow-hidden">
+        <div className="relative z-10 max-w-lg">
+          <div className="flex items-center gap-2 text-2xl font-display font-bold mb-12">
+            <Leaf className="w-8 h-8 fill-white text-[#449e63]" />
             RecycleLah!
           </div>
-          <h1 className="text-5xl font-display font-bold leading-tight mb-6">
-            Join the Green Revolution.
+          <h1 className="text-7xl font-display font-bold leading-[1.1] mb-8">
+            Turn your waste into wealth.
           </h1>
-          <p className="text-xl opacity-90 font-light max-w-md">
-            Connect with local collectors to recycle your waste efficiently. 
-            Earn rewards while saving the planet.
+          <p className="text-xl opacity-90 font-medium leading-relaxed">
+            Join thousands of users making the planet greener. Connect with collectors, schedule pickups, and earn rewards for recycling.
           </p>
         </div>
 
-        <div className="relative z-10 text-sm opacity-60">
-          © 2024 RecycleLah! Inc.
+        <div className="absolute bottom-12 left-12 z-10 text-sm opacity-60">
+          © 2024 RecycleLah. Making the world cleaner.
         </div>
       </div>
 
@@ -107,42 +92,31 @@ export default function AuthPage() {
               <Card className="border-none shadow-none">
                 <CardHeader className="px-0">
                   <CardTitle className="text-2xl font-display">Welcome back</CardTitle>
-                  <CardDescription>Enter your credentials to access your account</CardDescription>
+                  <CardDescription>Sign in to manage your recycling activities</CardDescription>
                 </CardHeader>
                 <CardContent className="px-0">
-                  <Form {...loginForm}>
-                    <form onSubmit={loginForm.handleSubmit((d) => loginMutation.mutate(d))} className="space-y-4">
-                      <FormField
-                        control={loginForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter your username" {...field} className="h-12" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={loginForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="••••••••" {...field} className="h-12" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button className="w-full h-12 text-base font-medium mt-4" type="submit" disabled={loginMutation.isPending}>
-                        {loginMutation.isPending ? "Logging in..." : "Login"}
-                      </Button>
-                    </form>
-                  </Form>
+                  <div className="space-y-4">
+                    <Button 
+                      className="w-full h-12 text-base font-medium flex items-center justify-center gap-2 bg-[#449e63] hover:bg-[#3d8d58] text-white rounded-md" 
+                      onClick={() => window.location.href = "/replit/auth"}
+                    >
+                      Log In with Replit
+                      <span className="text-xl">→</span>
+                    </Button>
+                    <div className="relative py-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-muted" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground tracking-widest">
+                          Secure Authentication
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-center text-sm text-muted-foreground">
+                      New here? Creating an account takes seconds.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

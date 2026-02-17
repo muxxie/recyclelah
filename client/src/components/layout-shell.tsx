@@ -19,7 +19,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  if (!user) return <>{children}</>;
+  if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
   const isCollector = user.role === 'collector';
 

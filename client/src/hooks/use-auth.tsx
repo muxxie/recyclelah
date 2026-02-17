@@ -1,115 +1,83 @@
 import { createContext, ReactNode, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { InsertUser, User } from "@shared/schema";
-import { api } from "@shared/routes"; // Ensure this matches your routes export
+import { User } from "@shared/models/auth";
 import { useLocation } from "wouter";
-import { z } from "zod";
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: ReturnType<typeof useLoginMutation>;
-  logoutMutation: ReturnType<typeof useLogoutMutation>;
-  registerMutation: ReturnType<typeof useRegisterMutation>;
+  loginMutation: any;
+  registerMutation: any;
+  logoutMutation: any;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function useLoginMutation() {
-  const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
-  
-  return useMutation({
-    mutationFn: async (credentials: z.infer<typeof api.auth.login.input>) => {
-      const res = await fetch(api.auth.login.path, {
-        method: api.auth.login.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Login failed");
-      }
-      return await res.json();
-    },
-    onSuccess: (user: User) => {
-      queryClient.setQueryData([api.auth.me.path], user);
-      setLocation(user.role === "collector" ? "/collector" : "/dashboard");
-    },
-  });
-}
-
-function useRegisterMutation() {
-  const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
-
-  return useMutation({
-    mutationFn: async (credentials: InsertUser) => {
-      const res = await fetch(api.auth.register.path, {
-        method: api.auth.register.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Registration failed");
-      }
-      return await res.json();
-    },
-    onSuccess: (user: User) => {
-      queryClient.setQueryData([api.auth.me.path], user);
-      setLocation(user.role === "collector" ? "/collector" : "/dashboard");
-    },
-  });
-}
-
-function useLogoutMutation() {
-  const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
-
-  return useMutation({
-    mutationFn: async () => {
-      await fetch(api.auth.logout.path, { method: api.auth.logout.method });
-    },
-    onSuccess: () => {
-      queryClient.setQueryData([api.auth.me.path], null);
-      setLocation("/");
-    },
-  });
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const {
-    data: user,
-    error,
-    isLoading,
-  } = useQuery<User | null, Error>({
-    queryKey: [api.auth.me.path],
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
+  const { data: user, isLoading, error } = useQuery<User | null>({
+    queryKey: ["/api/auth/user"],
     queryFn: async () => {
-      const res = await fetch(api.auth.me.path);
+      const res = await fetch("/api/auth/user");
       if (res.status === 401) return null;
       if (!res.ok) throw new Error("Failed to fetch user");
-      return await res.json();
+      return res.json();
     },
-    staleTime: Infinity,
+    retry: false,
   });
 
-  const loginMutation = useLoginMutation();
-  const logoutMutation = useLogoutMutation();
-  const registerMutation = useRegisterMutation();
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: any) => {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+      if (!res.ok) throw new Error("Login failed");
+      return res.json();
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/auth/user"], user);
+    }
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (credentials: any) => {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+      if (!res.ok) throw new Error("Registration failed");
+      return res.json();
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/auth/user"], user);
+    }
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await fetch("/api/logout", { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      setLocation("/");
+    }
+  });
 
   return (
-    <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-        loginMutation,
-        logoutMutation,
-        registerMutation,
-      }}
-    >
+    <AuthContext.Provider value={{ 
+      user: user ?? null, 
+      isLoading, 
+      error,
+      loginMutation,
+      registerMutation,
+      logoutMutation
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -117,8 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 }

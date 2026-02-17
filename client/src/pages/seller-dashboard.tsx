@@ -10,49 +10,38 @@ import { Slider } from "@/components/ui/slider";
 import { Plus, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { api } from "@shared/routes";
+import { insertRequestSchema } from "@shared/schema";
 import { itemTypes } from "@shared/schema";
 import { useGeolocation } from "@/hooks/use-geo";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 
-const createRequestSchema = api.requests.create.input;
-
 function CreateRequestDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { mutate, isPending } = useCreateRequest();
   const { location } = useGeolocation();
   
-  const form = useForm<z.infer<typeof createRequestSchema>>({
-    resolver: zodResolver(createRequestSchema),
+  const form = useForm<z.infer<typeof insertRequestSchema>>({
+    resolver: zodResolver(insertRequestSchema),
     defaultValues: {
       itemTypes: [],
       estimatedWeight: 5,
       address: "",
-      latitude: 3.14, // Default fallback
-      longitude: 101.68,
+      latitude: "3.14",
+      longitude: "101.68",
       isImmediate: true,
     },
   });
 
-  // Auto-fill location
   useEffect(() => {
     if (location) {
-      form.setValue("latitude", location.lat);
-      form.setValue("longitude", location.lng);
-      // In a real app, reverse geocode here to get address string
+      form.setValue("latitude", String(location.lat));
+      form.setValue("longitude", String(location.lng));
       form.setValue("address", "Current Location (Detected)");
     }
   }, [location, form]);
 
-  const onSubmit = (data: z.infer<typeof createRequestSchema>) => {
-    // Ensure numbers are numbers
-    const payload = {
-      ...data,
-      estimatedWeight: Number(data.estimatedWeight),
-      latitude: Number(data.latitude),
-      longitude: Number(data.longitude),
-    };
-    mutate(payload, {
+  const onSubmit = (data: z.infer<typeof insertRequestSchema>) => {
+    mutate(data, {
       onSuccess: () => {
         onOpenChange(false);
         form.reset();
@@ -97,7 +86,7 @@ function CreateRequestDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                                   checked={field.value?.includes(type)}
                                   onCheckedChange={(checked) => {
                                     return checked
-                                      ? field.onChange([...field.value, type])
+                                      ? field.onChange([...(field.value || []), type])
                                       : field.onChange(
                                           field.value?.filter(
                                             (value) => value !== type
@@ -130,7 +119,7 @@ function CreateRequestDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                       min={1}
                       max={50}
                       step={1}
-                      defaultValue={[field.value]}
+                      value={[field.value]}
                       onValueChange={(vals) => field.onChange(vals[0])}
                     />
                   </FormControl>

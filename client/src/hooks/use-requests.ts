@@ -93,7 +93,10 @@ export function useCompleteRequest() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to complete request");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to complete request");
+      }
       return api.requests.complete.responses[200].parse(await res.json());
     },
     onSuccess: () => {
