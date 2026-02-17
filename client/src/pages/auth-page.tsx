@@ -65,7 +65,12 @@ export default function AuthPage() {
 
   const canGoToStep3 = () => {
     const vals = registerForm.getValues();
-    return icFront.length > 0 && icBack.length > 0 && vals.icNumber.replace(/[-\s]/g, "").length >= 12;
+    const cleaned = vals.icNumber.replace(/[-\s]/g, "");
+    if (cleaned.length !== 12 || !/^\d{12}$/.test(cleaned)) return false;
+    const bd = parseIcBirthDate(vals.icNumber);
+    if (!bd) return false;
+    if (getAgeFromBirthDate(bd) < 18) return false;
+    return icFront.length > 0 && icBack.length > 0;
   };
 
   const handleNextStep = async () => {
