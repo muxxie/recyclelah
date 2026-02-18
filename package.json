@@ -71,6 +71,7 @@
     "openid-client": "^6.8.2",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "tsx": "^4.20.5",
     "pg": "^8.16.3",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -89,6 +90,7 @@
     "ws": "^8.19.0",
     "zod": "^3.24.2",
     "zod-validation-error": "^3.4.0"
+    
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.4.4",
@@ -111,7 +113,7 @@
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.20.5",
+    
     "typescript": "5.6.3",
     "vite": "^7.3.0"
   },
